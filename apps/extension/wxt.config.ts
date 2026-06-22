@@ -9,6 +9,7 @@ export default defineConfig({
       default_title: 'Open Kotoba workspace',
     },
     permissions: ['storage'],
+    host_permissions: ['http://*/*', 'https://*/*'],
   },
   vite: () => ({
     plugins: [tailwindcss()]

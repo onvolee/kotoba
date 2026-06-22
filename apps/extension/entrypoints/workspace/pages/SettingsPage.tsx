@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import {
   ArrowLeft,
   BarChart3,
-  CheckCircle2,
   Database,
+  Eye,
   EyeOff,
   KeyRound,
   Languages,
@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/input-group";
 import { cn } from "@/lib/utils";
 import { testAIConnection } from "../ai-connection";
-import { getSavedAISettings, saveAISettings, type AISettings } from "../ai-settings";
+import { getSavedAISettings, saveAIConnectionStatus, saveAISettings, type AIConnectionStatus, type AISettings } from "../ai-settings";
 import { applyUiLanguagePreference, getSavedUiLanguagePreference, type UiLanguagePreference } from "../i18n";
 
 type SettingsModule = "ai" | "local-data" | "performance";
@@ -139,8 +139,8 @@ function AISettingsModule() {
     apiKey: "",
     model: "",
   });
-  const [connectionResult, setConnectionResult] = useState<"not-tested" | "testing" | "passed" | "failed">("not-tested");
-  const [connectionError, setConnectionError] = useState("");
+  const [connectionStatus, setConnectionStatus] = useState<AIConnectionStatus | "testing">("not-tested");
+  const [isApiKeyVisible, setIsApiKeyVisible] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -148,6 +148,7 @@ function AISettingsModule() {
     getSavedAISettings().then((savedSettings) => {
       if (isMounted) {
         setSettings(savedSettings);
+        setConnectionStatus(savedSettings.connectionStatus);
       }
     });
 
@@ -159,30 +160,27 @@ function AISettingsModule() {
   async function handleSaveSettings() {
     const savedSettings = await saveAISettings(settings);
     setSettings(savedSettings);
+    setConnectionStatus(savedSettings.connectionStatus);
   }
 
   async function handleTestConnection() {
     const savedSettings = await saveAISettings(settings);
     setSettings(savedSettings);
-    setConnectionError("");
-    setConnectionResult("testing");
+    setConnectionStatus("testing");
 
-    const result = await testAIConnection(savedSettings);
+    const result = await testAIConnection(toAISettings(savedSettings));
+    const nextStatus = result.ok ? "passed" : "failed";
+    const settingsWithStatus = await saveAIConnectionStatus(nextStatus);
 
-    if (result.ok) {
-      setConnectionResult("passed");
-      return;
-    }
-
-    setConnectionResult("failed");
-    setConnectionError(result.error);
+    setConnectionStatus(settingsWithStatus.connectionStatus);
   }
 
   return (
     <ModuleShell
       title={t("settings.ai.title")}
       description={t("settings.ai.description")}
-      status={t("settings.ai.status")}
+      status={t(`settings.ai.connectionResults.${connectionStatus}`)}
+      statusTone={connectionStatus === "passed" ? "success" : "default"}
       icon={<KeyRound aria-hidden="true" />}
     >
       <section className="flex flex-col gap-4 border-b p-4 md:p-6" aria-label={t("settings.ai.providerRequest")}>
@@ -207,15 +205,19 @@ function AISettingsModule() {
             <InputGroup>
               <InputGroupInput
                 id="api-key"
-                type="password"
+                type={isApiKeyVisible ? "text" : "password"}
                 name="api-key"
                 value={settings.apiKey}
                 onChange={(event) => setSettings((currentSettings) => ({ ...currentSettings, apiKey: event.target.value }))}
                 autoComplete="off"
               />
               <InputGroupAddon align="inline-end">
-                <InputGroupButton aria-label={t("settings.ai.hideApiKey")} size="icon-xs">
-                  <EyeOff aria-hidden="true" />
+                <InputGroupButton
+                  aria-label={t(isApiKeyVisible ? "settings.ai.hideApiKey" : "settings.ai.showApiKey")}
+                  size="icon-xs"
+                  onClick={() => setIsApiKeyVisible((visible) => !visible)}
+                >
+                  {isApiKeyVisible ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
                 </InputGroupButton>
               </InputGroupAddon>
             </InputGroup>
@@ -239,13 +241,8 @@ function AISettingsModule() {
           <p className="text-sm text-muted-foreground">{t("settings.ai.connectionTestDescription")}</p>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-2">
-          <StatusRow label={t("settings.ai.lastResult")} value={t(`settings.ai.connectionResults.${connectionResult}`)} />
-          <StatusRow label={t("settings.ai.errorHandling")} value={connectionError || t("settings.ai.noError")} />
-        </div>
-
         <div className="flex flex-wrap justify-end gap-2">
-          <Button type="button" variant="outline" onClick={handleTestConnection} disabled={connectionResult === "testing"}>
+          <Button type="button" variant="outline" onClick={handleTestConnection} disabled={connectionStatus === "testing"}>
             {t("settings.ai.testConnection")}
           </Button>
           <Button type="button" onClick={handleSaveSettings}>
@@ -255,6 +252,14 @@ function AISettingsModule() {
       </section>
     </ModuleShell>
   );
+}
+
+function toAISettings(settings: AISettings): AISettings {
+  return {
+    baseUrl: settings.baseUrl,
+    apiKey: settings.apiKey,
+    model: settings.model,
+  };
 }
 
 function LocalDataModule() {
@@ -354,12 +359,14 @@ function ModuleShell({
   title,
   description,
   status,
+  statusTone = "default",
   icon,
   children,
 }: {
   title: string;
   description: string;
   status?: string;
+  statusTone?: "default" | "success";
   icon: React.ReactNode;
   children: React.ReactNode;
 }) {
@@ -376,7 +383,12 @@ function ModuleShell({
           </div>
         </div>
         {status ? (
-          <div className="inline-flex shrink-0 items-center gap-2 rounded-lg border bg-background px-2.5 py-1.5 text-sm text-muted-foreground">
+          <div
+            className={cn(
+              "inline-flex shrink-0 items-center gap-2 rounded-lg border bg-background px-2.5 py-1.5 text-sm",
+              statusTone === "success" ? "border-green-200 bg-green-50 text-green-700" : "text-muted-foreground"
+            )}
+          >
             <ShieldCheck aria-hidden="true" />
             {status}
           </div>
@@ -397,18 +409,6 @@ function SettingsField({ id, label, description, children }: { id: string; label
         <p className="text-sm text-muted-foreground">{description}</p>
       </div>
       {children}
-    </div>
-  );
-}
-
-function StatusRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-lg border bg-background p-3 text-sm">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="inline-flex items-center gap-2 font-medium">
-        <CheckCircle2 aria-hidden="true" />
-        {value}
-      </span>
     </div>
   );
 }
