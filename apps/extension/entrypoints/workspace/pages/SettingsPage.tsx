@@ -22,6 +22,8 @@ import {
   InputGroupInput,
 } from "@/components/ui/input-group";
 import { cn } from "@/lib/utils";
+import { testAIConnection } from "../ai-connection";
+import { getSavedAISettings, saveAISettings, type AISettings } from "../ai-settings";
 import { applyUiLanguagePreference, getSavedUiLanguagePreference, type UiLanguagePreference } from "../i18n";
 
 type SettingsModule = "ai" | "local-data" | "performance";
@@ -132,6 +134,49 @@ export function SettingsPage() {
 
 function AISettingsModule() {
   const { t } = useTranslation();
+  const [settings, setSettings] = useState<AISettings>({
+    baseUrl: "",
+    apiKey: "",
+    model: "",
+  });
+  const [connectionResult, setConnectionResult] = useState<"not-tested" | "testing" | "passed" | "failed">("not-tested");
+  const [connectionError, setConnectionError] = useState("");
+
+  useEffect(() => {
+    let isMounted = true;
+
+    getSavedAISettings().then((savedSettings) => {
+      if (isMounted) {
+        setSettings(savedSettings);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  async function handleSaveSettings() {
+    const savedSettings = await saveAISettings(settings);
+    setSettings(savedSettings);
+  }
+
+  async function handleTestConnection() {
+    const savedSettings = await saveAISettings(settings);
+    setSettings(savedSettings);
+    setConnectionError("");
+    setConnectionResult("testing");
+
+    const result = await testAIConnection(savedSettings);
+
+    if (result.ok) {
+      setConnectionResult("passed");
+      return;
+    }
+
+    setConnectionResult("failed");
+    setConnectionError(result.error);
+  }
 
   return (
     <ModuleShell
@@ -152,7 +197,8 @@ function AISettingsModule() {
               id="base-url"
               type="url"
               name="base-url"
-              defaultValue="https://api.deepseek.com"
+              value={settings.baseUrl}
+              onChange={(event) => setSettings((currentSettings) => ({ ...currentSettings, baseUrl: event.target.value }))}
               autoComplete="url"
             />
           </SettingsField>
@@ -163,7 +209,8 @@ function AISettingsModule() {
                 id="api-key"
                 type="password"
                 name="api-key"
-                defaultValue="sk-placeholder"
+                value={settings.apiKey}
+                onChange={(event) => setSettings((currentSettings) => ({ ...currentSettings, apiKey: event.target.value }))}
                 autoComplete="off"
               />
               <InputGroupAddon align="inline-end">
@@ -175,7 +222,13 @@ function AISettingsModule() {
           </SettingsField>
 
           <SettingsField id="model" label={t("settings.ai.modelLabel")} description={t("settings.ai.modelDescription")}>
-            <Input id="model" name="model" defaultValue="deepseek-chat" autoComplete="off" />
+            <Input
+              id="model"
+              name="model"
+              value={settings.model}
+              onChange={(event) => setSettings((currentSettings) => ({ ...currentSettings, model: event.target.value }))}
+              autoComplete="off"
+            />
           </SettingsField>
         </div>
       </section>
@@ -187,15 +240,15 @@ function AISettingsModule() {
         </div>
 
         <div className="grid gap-3 md:grid-cols-2">
-          <StatusRow label={t("settings.ai.lastResult")} value={t("settings.ai.notTested")} />
-          <StatusRow label={t("settings.ai.errorHandling")} value={t("settings.ai.noError")} />
+          <StatusRow label={t("settings.ai.lastResult")} value={t(`settings.ai.connectionResults.${connectionResult}`)} />
+          <StatusRow label={t("settings.ai.errorHandling")} value={connectionError || t("settings.ai.noError")} />
         </div>
 
         <div className="flex flex-wrap justify-end gap-2">
-          <Button type="button" variant="outline" disabled>
+          <Button type="button" variant="outline" onClick={handleTestConnection} disabled={connectionResult === "testing"}>
             {t("settings.ai.testConnection")}
           </Button>
-          <Button type="button" disabled>
+          <Button type="button" onClick={handleSaveSettings}>
             {t("common.actions.saveChanges")}
           </Button>
         </div>

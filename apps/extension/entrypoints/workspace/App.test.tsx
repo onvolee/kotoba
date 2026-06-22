@@ -1,15 +1,25 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fakeBrowser } from "wxt/testing";
 import App from "./App";
 import { resetWorkspaceI18nForTests } from "./i18n";
 import { ContentViewer } from "./pages/WorkspacePage";
 
+const connectionMocks = vi.hoisted(() => ({
+  testAIConnection: vi.fn(),
+}));
+
+vi.mock("./ai-connection", () => ({
+  testAIConnection: connectionMocks.testAIConnection,
+}));
+
 describe("workspace shell", () => {
   beforeEach(() => {
     window.location.hash = "";
     fakeBrowser.reset();
+    connectionMocks.testAIConnection.mockReset();
+    connectionMocks.testAIConnection.mockResolvedValue({ ok: true });
     setBrowserLanguage("en-US");
     resetWorkspaceI18nForTests();
   });
@@ -72,6 +82,53 @@ describe("workspace shell", () => {
     expect(screen.getByRole("group", { name: "UI language" })).toBeInTheDocument();
     expect(screen.getByRole("group", { name: "Theme" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Back to workspace" })).toHaveAttribute("href", "#");
+  });
+
+  it("saves AI provider settings and shows them when settings is opened again", async () => {
+    const user = userEvent.setup();
+    const firstRender = render(<App />);
+
+    await user.click(await screen.findByRole("button", { name: "Open settings" }));
+    await user.click(screen.getByRole("button", { name: /AI settings/ }));
+
+    await user.clear(screen.getByLabelText("Base URL"));
+    await user.type(screen.getByLabelText("Base URL"), " https://api.example.com/v1/ ");
+    await user.clear(screen.getByLabelText("API Key"));
+    await user.type(screen.getByLabelText("API Key"), "sk-real-key");
+    await user.clear(screen.getByLabelText("Model"));
+    await user.type(screen.getByLabelText("Model"), "example-chat");
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+
+    firstRender.unmount();
+    window.location.hash = "#settings";
+    resetWorkspaceI18nForTests();
+
+    render(<App />);
+    await user.click(await screen.findByRole("button", { name: /AI settings/ }));
+
+    await waitFor(() => expect(screen.getByLabelText("Base URL")).toHaveValue("https://api.example.com/v1"));
+    expect(screen.getByLabelText("API Key")).toHaveValue("sk-real-key");
+    expect(screen.getByLabelText("Model")).toHaveValue("example-chat");
+  });
+
+  it("tests the current AI provider settings and shows a successful connection result", async () => {
+    const user = userEvent.setup();
+
+    render(<App />);
+
+    await user.click(await screen.findByRole("button", { name: "Open settings" }));
+    await user.click(screen.getByRole("button", { name: /AI settings/ }));
+    await user.type(screen.getByLabelText("Base URL"), " https://api.example.com/v1/ ");
+    await user.type(screen.getByLabelText("API Key"), "sk-real-key");
+    await user.type(screen.getByLabelText("Model"), "example-chat");
+    await user.click(screen.getByRole("button", { name: "Test connection" }));
+
+    await waitFor(() => expect(screen.getByText("Connection passed")).toBeInTheDocument());
+    expect(connectionMocks.testAIConnection).toHaveBeenCalledWith({
+      baseUrl: "https://api.example.com/v1",
+      apiKey: "sk-real-key",
+      model: "example-chat",
+    });
   });
 
   it("does not change the workspace language before saving a settings language choice", async () => {

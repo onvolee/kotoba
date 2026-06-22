@@ -16,8 +16,10 @@
     "postinstall": "wxt prepare"
   },
   "dependencies": {
+    "@ai-sdk/openai-compatible": "^2.0.51",
     "@base-ui/react": "^1.6.0",
     "@tailwindcss/vite": "^4.3.1",
+    "ai": "^6.0.208",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "i18next": "^26.3.1",
