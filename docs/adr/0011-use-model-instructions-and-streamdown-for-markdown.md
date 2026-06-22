@@ -1,0 +1,3 @@
+# Use model instructions and Streamdown for Markdown handling
+
+Kotoba will rely on model instructions to preserve Markdown structure during first-version translation instead of parsing Markdown into an AST and replacing protected text nodes. The translation panel will use Streamdown to render streamed Markdown output with the code and Mermaid plugins enabled, including Shiki highlighting for code blocks with the `vitesse-dark` dark theme. The preview layer will disable raw HTML rendering for AI-generated output, while copy and download actions still use the original translated Markdown text. Streamdown is a rendering layer and not a translation-protection layer, so AST-based Markdown segmentation, token protection, and reserialization remain deferred.

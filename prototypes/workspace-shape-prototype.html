@@ -1,0 +1,969 @@
+<!doctype html>
+<!--
+  PROTOTYPE - wipe me.
+  Question: What should the Kotoba extension-owned translation workspace look like after choosing the split workspace shape?
+  Single A-shaped prototype with mocked controls, drag state, and a history side panel.
+-->
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Kotoba workspace shape prototype</title>
+    <style>
+      :root {
+        --ink: #20231f;
+        --muted: #657066;
+        --paper: #f7f6ef;
+        --panel: #fffffa;
+        --line: #d9d7ca;
+        --blue: #265f73;
+        --blue-deep: #123c4a;
+        --green: #69835d;
+        --gold: #b9843d;
+        --red: #b65f48;
+        --code: #343936;
+        --shadow: 0 18px 45px rgba(32, 35, 31, 0.14);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", sans-serif;
+        color-scheme: light;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        min-width: 980px;
+        margin: 0;
+        background: var(--paper);
+        color: var(--ink);
+      }
+
+      button,
+      textarea,
+      select {
+        font: inherit;
+      }
+
+      button {
+        border: 0;
+        cursor: pointer;
+      }
+
+      .app-shell {
+        min-height: 100vh;
+      }
+
+      .topbar {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        display: grid;
+        grid-template-columns: minmax(220px, 1fr) auto minmax(220px, 1fr);
+        align-items: center;
+        gap: 18px;
+        min-height: 68px;
+        padding: 0 24px;
+        border-bottom: 1px solid var(--line);
+        background: rgba(247, 246, 239, 0.94);
+        backdrop-filter: blur(18px);
+      }
+
+      .brand {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+        min-width: 0;
+      }
+
+      .brand strong {
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: 24px;
+        letter-spacing: 0;
+      }
+
+      .brand span {
+        overflow: hidden;
+        color: var(--muted);
+        font-size: 13px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .center-controls,
+      .right-controls,
+      .language-pair {
+        display: flex;
+        align-items: center;
+      }
+
+      .center-controls {
+        justify-content: center;
+        gap: 10px;
+      }
+
+      .right-controls {
+        justify-content: flex-end;
+        gap: 8px;
+      }
+
+      .language-pair {
+        gap: 7px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        padding: 5px;
+      }
+
+      .language-select {
+        min-height: 32px;
+        min-width: 118px;
+        border: 0;
+        border-radius: 6px;
+        background: transparent;
+        padding: 0 8px;
+        color: var(--ink);
+        font-size: 13px;
+      }
+
+      .pair-arrow {
+        display: inline-grid;
+        width: 28px;
+        height: 28px;
+        place-items: center;
+        border-radius: 50%;
+        background: rgba(38, 95, 115, 0.09);
+        color: var(--blue-deep);
+        font-size: 14px;
+      }
+
+      .chip,
+      .primary-button,
+      .ghost-button,
+      .danger-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 36px;
+        border-radius: 8px;
+        padding: 0 13px;
+        font-size: 13px;
+        white-space: nowrap;
+      }
+
+      .chip {
+        border: 1px solid var(--line);
+        background: var(--panel);
+        color: var(--ink);
+      }
+
+      .primary-button {
+        background: var(--blue);
+        color: #fffef6;
+        font-weight: 680;
+      }
+
+      .ghost-button {
+        border: 1px solid var(--line);
+        background: transparent;
+        color: var(--ink);
+      }
+
+      .danger-button {
+        border: 1px solid rgba(182, 95, 72, 0.34);
+        background: rgba(182, 95, 72, 0.08);
+        color: var(--red);
+      }
+
+      .workspace {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 18px;
+        height: calc(100vh - 68px);
+        min-height: 670px;
+        padding: 22px;
+      }
+
+      .panel {
+        display: flex;
+        min-height: 0;
+        flex-direction: column;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        box-shadow: 0 1px 0 rgba(32, 35, 31, 0.04);
+      }
+
+      .panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        flex-shrink: 0;
+        min-height: 56px;
+        padding: 13px 16px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .panel-title {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        min-width: 0;
+        font-size: 13px;
+        font-weight: 740;
+      }
+
+      .panel-title span:last-child {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .panel-actions {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+      }
+
+      .panel-meta {
+        color: var(--muted);
+        font-size: 12px;
+        white-space: nowrap;
+      }
+
+      .dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background: var(--green);
+        box-shadow: 0 0 0 4px rgba(105, 131, 93, 0.14);
+      }
+
+      .input-hint {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        flex-shrink: 0;
+        min-height: 46px;
+        padding: 0 16px;
+        border-bottom: 1px solid var(--line);
+        background: rgba(38, 95, 115, 0.05);
+        color: var(--blue-deep);
+        font-size: 12px;
+      }
+
+      .editor-wrap {
+        position: relative;
+        display: flex;
+        min-height: 0;
+        flex: 1;
+      }
+
+      .editor,
+      .output {
+        width: 100%;
+        min-height: 100%;
+        border: 0;
+        outline: 0;
+        resize: none;
+        background: transparent;
+        padding: 18px;
+        color: var(--code);
+        font:
+          14px/1.7 "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      }
+
+      .output {
+        flex: 1;
+        min-height: 0;
+        margin: 0;
+        overflow: auto;
+        white-space: pre-wrap;
+      }
+
+      .drop-overlay {
+        position: absolute;
+        inset: 14px;
+        display: none;
+        place-items: center;
+        border: 1px dashed rgba(38, 95, 115, 0.62);
+        border-radius: 8px;
+        background: rgba(255, 255, 250, 0.9);
+        color: var(--blue-deep);
+        text-align: center;
+        backdrop-filter: blur(10px);
+      }
+
+      .drop-overlay strong {
+        display: block;
+        margin-bottom: 7px;
+        font-size: 15px;
+      }
+
+      .drop-overlay span {
+        display: block;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .dragging .drop-overlay {
+        display: grid;
+      }
+
+      .status-strip {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        flex-shrink: 0;
+        min-height: 48px;
+        padding: 0 16px;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .bottom-actions {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 7px;
+        flex-wrap: wrap;
+      }
+
+      .drawer-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 40;
+        display: none;
+        background: rgba(32, 35, 31, 0.2);
+      }
+
+      .drawer-backdrop.open {
+        display: block;
+      }
+
+      .history-drawer {
+        position: fixed;
+        top: 0;
+        right: 0;
+        z-index: 50;
+        display: flex;
+        width: min(480px, 100vw);
+        height: 100vh;
+        flex-direction: column;
+        border-left: 1px solid rgba(32, 35, 31, 0.16);
+        background: #f3f2e8;
+        box-shadow: var(--shadow);
+        transform: translateX(100%);
+        transition: transform 180ms ease;
+      }
+
+      .history-drawer.open {
+        transform: translateX(0);
+      }
+
+      .drawer-header {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: start;
+        gap: 12px;
+        padding: 18px 18px 14px;
+        border-bottom: 1px solid rgba(32, 35, 31, 0.12);
+      }
+
+      .drawer-header strong {
+        display: block;
+        margin-bottom: 3px;
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: 24px;
+        line-height: 1;
+      }
+
+      .drawer-header span {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .history-tools {
+        display: grid;
+        gap: 10px;
+        padding: 14px 18px;
+        border-bottom: 1px solid rgba(32, 35, 31, 0.1);
+      }
+
+      .history-search {
+        width: 100%;
+        min-height: 38px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fffffa;
+        padding: 0 12px;
+        color: var(--ink);
+        font: inherit;
+        font-size: 13px;
+      }
+
+      .history-stats {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .history-stat {
+        border: 1px solid rgba(32, 35, 31, 0.1);
+        border-radius: 8px;
+        background: rgba(255, 255, 250, 0.66);
+        padding: 9px 10px;
+      }
+
+      .history-stat strong {
+        display: block;
+        margin-bottom: 2px;
+        font-size: 13px;
+      }
+
+      .history-stat span {
+        color: var(--muted);
+        font-size: 11px;
+      }
+
+      .history-list {
+        display: grid;
+        gap: 14px;
+        overflow: auto;
+        padding: 16px 18px 24px;
+      }
+
+      .history-group {
+        display: grid;
+        gap: 8px;
+      }
+
+      .history-date {
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 760;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      .history-item {
+        display: grid;
+        position: relative;
+        gap: 10px;
+        width: 100%;
+        border: 1px solid rgba(32, 35, 31, 0.12);
+        border-radius: 8px;
+        background: #fffffa;
+        padding: 14px 14px 13px 17px;
+        color: var(--ink);
+        text-align: left;
+        box-shadow: 0 1px 0 rgba(32, 35, 31, 0.04);
+      }
+
+      .history-item::before {
+        position: absolute;
+        top: 12px;
+        bottom: 12px;
+        left: 7px;
+        width: 3px;
+        border-radius: 99px;
+        background: var(--blue);
+        content: "";
+      }
+
+      .history-item:hover {
+        border-color: rgba(38, 95, 115, 0.34);
+        background: #fffef6;
+      }
+
+      .history-item strong {
+        overflow: hidden;
+        font-size: 14px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .history-item span {
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.5;
+      }
+
+      .history-item-top,
+      .history-item-bottom {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .history-item-top {
+        min-width: 0;
+      }
+
+      .history-badge {
+        flex-shrink: 0;
+        border: 1px solid rgba(38, 95, 115, 0.18);
+        border-radius: 999px;
+        background: rgba(38, 95, 115, 0.07);
+        padding: 3px 8px;
+        color: var(--blue-deep);
+        font-size: 11px;
+        font-weight: 680;
+      }
+
+      .history-mini-actions {
+        display: flex;
+        flex-shrink: 0;
+        gap: 6px;
+      }
+
+      .history-mini-actions button {
+        min-height: 28px;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        background: transparent;
+        padding: 0 8px;
+        color: var(--ink);
+        font-size: 12px;
+      }
+
+      .toast {
+        position: fixed;
+        right: 18px;
+        bottom: 18px;
+        z-index: 70;
+        display: none;
+        border: 1px solid rgba(32, 35, 31, 0.14);
+        border-radius: 8px;
+        background: var(--ink);
+        padding: 12px 14px;
+        color: #fffef6;
+        box-shadow: var(--shadow);
+        font-size: 13px;
+      }
+
+      .toast.show {
+        display: block;
+      }
+
+      @media (max-width: 1080px) {
+        body {
+          min-width: 0;
+        }
+
+        .topbar {
+          position: static;
+          grid-template-columns: 1fr;
+          justify-items: start;
+          padding: 16px;
+        }
+
+        .center-controls,
+        .right-controls {
+          justify-content: flex-start;
+          flex-wrap: wrap;
+        }
+
+        .workspace {
+          grid-template-columns: 1fr;
+          height: auto;
+          min-height: 0;
+          padding: 16px;
+        }
+
+        .panel {
+          min-height: 520px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <strong>Kotoba</strong>
+          <span>Markdown and text translation workspace</span>
+        </div>
+
+        <div class="center-controls" aria-label="Translation mode controls">
+          <div class="language-pair" aria-label="Translation direction">
+            <select id="source-language" class="language-select" aria-label="Source language">
+              <option value="English">English</option>
+              <option value="中文">中文</option>
+            </select>
+            <span class="pair-arrow" aria-hidden="true">→</span>
+            <select id="target-language" class="language-select" aria-label="Target language">
+              <option value="简体中文">简体中文</option>
+              <option value="English">English</option>
+            </select>
+          </div>
+          <button id="translate" class="primary-button" type="button">Translate</button>
+        </div>
+
+        <div class="right-controls" aria-label="Workspace controls">
+          <select id="style-select" class="chip" aria-label="Translation style">
+            <option>Faithful</option>
+            <option>Technical</option>
+            <option>Concise</option>
+            <option>Polished</option>
+          </select>
+          <button id="input-type" class="chip" type="button">Markdown</button>
+          <button id="open-history" class="ghost-button" type="button">History</button>
+          <button class="ghost-button" type="button">Settings</button>
+        </div>
+      </header>
+
+      <section class="workspace">
+        <article id="source-panel" class="panel">
+          <div class="panel-header">
+            <div class="panel-title"><span class="dot"></span><span>Source</span></div>
+            <div class="panel-actions">
+              <span id="source-meta" class="panel-meta">README.md · 3.8 KB</span>
+            </div>
+          </div>
+          <div id="input-hint" class="input-hint">
+            <span>Drag a .md or .txt file onto the editor, upload from the bottom bar, or paste directly.</span>
+          </div>
+          <div id="editor-wrap" class="editor-wrap">
+            <textarea id="source-editor" class="editor"># Streaming translation notes
+
+Use a Chat Completions compatible endpoint.
+
+- Preserve Markdown syntax.
+- Translate natural language only.
+- Keep `pnpm build`, file paths, URLs, and code unchanged.</textarea>
+            <div id="drop-overlay" class="drop-overlay">
+              <div>
+                <strong>Drop file to replace current content</strong>
+                <span>This editor already has text. The dropped file will overwrite it.</span>
+              </div>
+            </div>
+          </div>
+          <div class="status-strip">
+            <span id="source-status">Input: Markdown · Dragging a file here replaces the editor content</span>
+            <div class="bottom-actions">
+              <button id="mock-upload" class="ghost-button" type="button">Upload</button>
+              <button id="copy-source" class="ghost-button" type="button">Copy</button>
+              <button id="download-source" class="ghost-button" type="button">Download</button>
+              <button id="clear-source" class="danger-button" type="button">Clear</button>
+            </div>
+          </div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-header">
+            <div class="panel-title"><span class="dot"></span><span>Translation</span></div>
+            <div class="panel-actions">
+              <span id="output-meta" class="panel-meta">Streaming · Faithful · deepseek-chat</span>
+            </div>
+          </div>
+          <pre id="output" class="output"># 流式翻译说明
+
+使用兼容 Chat Completions 的端点。
+
+- 保留 Markdown 语法。
+- 只翻译自然语言。
+- 保持 `pnpm build`、文件路径、URL 和代码不变。
+
+正在生成下一段...</pre>
+          <div class="status-strip">
+            <span id="save-status">Successful translations are saved to local history.</span>
+            <div class="bottom-actions">
+              <button id="stop" class="ghost-button" type="button">Stop</button>
+              <button id="copy-output" class="ghost-button" type="button">Copy</button>
+              <button id="download-output" class="ghost-button" type="button">Download .zh.md</button>
+            </div>
+          </div>
+        </article>
+      </section>
+    </main>
+
+    <div id="drawer-backdrop" class="drawer-backdrop"></div>
+    <aside id="history-drawer" class="history-drawer" aria-label="Translation history">
+      <div class="drawer-header">
+        <div>
+          <strong>History</strong>
+          <span>Successful translations saved locally. API keys are never stored.</span>
+        </div>
+        <button id="close-history" class="ghost-button" type="button">Close</button>
+      </div>
+      <div class="history-tools">
+        <input class="history-search" value="" placeholder="Search filename, model, or translated text" />
+        <div class="history-stats" aria-label="History storage summary">
+          <div class="history-stat">
+            <strong>18.4 MB</strong>
+            <span>storage used</span>
+          </div>
+          <div class="history-stat">
+            <strong>42</strong>
+            <span>translations</span>
+          </div>
+          <div class="history-stat">
+            <strong>2</strong>
+            <span>directions</span>
+          </div>
+        </div>
+      </div>
+      <div class="history-list">
+        <section class="history-group" aria-label="Today">
+          <div class="history-date">Today</div>
+          <article class="history-item">
+            <div class="history-item-top">
+              <strong>README.zh.md</strong>
+              <span class="history-badge">Markdown</span>
+            </div>
+            <span>English -> 简体中文 · Faithful · deepseek-chat · 2 min ago</span>
+            <div class="history-item-bottom">
+              <span>3.8 KB source · README.md</span>
+              <div class="history-mini-actions">
+                <button type="button">Restore</button>
+                <button type="button">Delete</button>
+              </div>
+            </div>
+          </article>
+          <article class="history-item">
+            <div class="history-item-top">
+              <strong>api-guide.zh.md</strong>
+              <span class="history-badge">Technical</span>
+            </div>
+            <span>English -> 简体中文 · Technical · Preserved 14 code blocks</span>
+            <div class="history-item-bottom">
+              <span>12.1 KB source · api-guide.md</span>
+              <div class="history-mini-actions">
+                <button type="button">Restore</button>
+                <button type="button">Delete</button>
+              </div>
+            </div>
+          </article>
+        </section>
+
+        <section class="history-group" aria-label="Yesterday">
+          <div class="history-date">Yesterday</div>
+          <article class="history-item">
+            <div class="history-item-top">
+              <strong>release-notes.en.txt</strong>
+              <span class="history-badge">Plain text</span>
+            </div>
+            <span>中文 -> English · Polished · gpt-4.1-mini · 21:08</span>
+            <div class="history-item-bottom">
+              <span>1.6 KB source · release-notes.txt</span>
+              <div class="history-mini-actions">
+                <button type="button">Restore</button>
+                <button type="button">Delete</button>
+              </div>
+            </div>
+          </article>
+        </section>
+
+        <section class="history-group" aria-label="Last week">
+          <div class="history-date">Last week</div>
+          <article class="history-item">
+            <div class="history-item-top">
+              <strong>scope-notes.zh.md</strong>
+              <span class="history-badge">Concise</span>
+            </div>
+            <span>English -> 简体中文 · Concise · deepseek-chat</span>
+            <div class="history-item-bottom">
+              <span>6.4 KB source · scope-notes.md</span>
+              <div class="history-mini-actions">
+                <button type="button">Restore</button>
+                <button type="button">Delete</button>
+              </div>
+            </div>
+          </article>
+        </section>
+      </div>
+    </aside>
+
+    <div id="toast" class="toast" role="status"></div>
+
+    <script>
+      const state = {
+        direction: "en-zh",
+        style: "Faithful",
+        inputType: "Markdown",
+        outputExt: ".zh.md",
+      };
+
+      const sourceEditor = document.getElementById("source-editor");
+      const editorWrap = document.getElementById("editor-wrap");
+      const dropOverlay = document.getElementById("drop-overlay");
+      const sourceMeta = document.getElementById("source-meta");
+      const sourceStatus = document.getElementById("source-status");
+      const output = document.getElementById("output");
+      const outputMeta = document.getElementById("output-meta");
+      const downloadOutput = document.getElementById("download-output");
+      const sourceLanguage = document.getElementById("source-language");
+      const targetLanguage = document.getElementById("target-language");
+      const styleSelect = document.getElementById("style-select");
+      const inputType = document.getElementById("input-type");
+      const drawer = document.getElementById("history-drawer");
+      const backdrop = document.getElementById("drawer-backdrop");
+      const toast = document.getElementById("toast");
+
+      function showToast(message) {
+        toast.textContent = message;
+        toast.classList.add("show");
+        window.clearTimeout(showToast.timer);
+        showToast.timer = window.setTimeout(() => toast.classList.remove("show"), 1600);
+      }
+
+      function updateDerivedUi() {
+        const isEnZh = state.direction === "en-zh";
+        sourceLanguage.value = isEnZh ? "English" : "中文";
+        targetLanguage.value = isEnZh ? "简体中文" : "English";
+        state.outputExt = isEnZh ? ".zh.md" : ".en.md";
+        outputMeta.textContent = `Streaming · ${state.style} · deepseek-chat`;
+        downloadOutput.textContent = `Download ${state.outputExt}`;
+        sourceStatus.textContent =
+          `Input: ${state.inputType} · Dragging a file here replaces the editor content`;
+      }
+
+      function setDirection(direction) {
+        state.direction = direction;
+        output.textContent =
+          direction === "en-zh"
+            ? "# 流式翻译说明\n\n使用兼容 Chat Completions 的端点。\n\n- 保留 Markdown 语法。\n- 只翻译自然语言。\n- 保持 `pnpm build`、文件路径、URL 和代码不变。\n\n正在生成下一段..."
+            : "# Streaming Translation Notes\n\nUse a Chat Completions compatible endpoint.\n\n- Preserve Markdown syntax.\n- Translate natural language only.\n- Keep `pnpm build`, file paths, URLs, and code unchanged.\n\nGenerating the next paragraph...";
+        updateDerivedUi();
+      }
+
+      function openHistory() {
+        drawer.classList.add("open");
+        backdrop.classList.add("open");
+      }
+
+      function closeHistory() {
+        drawer.classList.remove("open");
+        backdrop.classList.remove("open");
+      }
+
+      function downloadText(filename, text) {
+        const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        link.click();
+        URL.revokeObjectURL(url);
+      }
+
+      function syncDirectionFromSelects(changedSide) {
+        if (changedSide === "source" && sourceLanguage.value === "English") {
+          setDirection("en-zh");
+          return;
+        }
+        if (changedSide === "source" && sourceLanguage.value === "中文") {
+          setDirection("zh-en");
+          return;
+        }
+        if (changedSide === "target" && targetLanguage.value === "简体中文") {
+          setDirection("en-zh");
+          return;
+        }
+        setDirection("zh-en");
+      }
+
+      sourceLanguage.addEventListener("change", () => syncDirectionFromSelects("source"));
+      targetLanguage.addEventListener("change", () => syncDirectionFromSelects("target"));
+
+      styleSelect.addEventListener("change", () => {
+        state.style = styleSelect.value;
+        updateDerivedUi();
+        showToast(`Style changed to ${state.style}`);
+      });
+
+      inputType.addEventListener("click", () => {
+        state.inputType = state.inputType === "Markdown" ? "Plain text" : "Markdown";
+        inputType.textContent = state.inputType;
+        updateDerivedUi();
+      });
+
+      document.getElementById("translate").addEventListener("click", () => {
+        showToast("Mock translation started");
+        document.getElementById("save-status").textContent =
+          "Streaming now. This result will be saved after completion.";
+      });
+
+      document.getElementById("stop").addEventListener("click", () => {
+        showToast("Mock stream stopped");
+        document.getElementById("save-status").textContent =
+          "Stopped translations are not saved to history.";
+      });
+
+      document.getElementById("copy-source").addEventListener("click", async () => {
+        await navigator.clipboard?.writeText(sourceEditor.value);
+        showToast("Source copied");
+      });
+
+      document.getElementById("copy-output").addEventListener("click", async () => {
+        await navigator.clipboard?.writeText(output.textContent);
+        showToast("Translation copied");
+      });
+
+      document.getElementById("download-source").addEventListener("click", () => {
+        downloadText("README.md", sourceEditor.value);
+        showToast("Source download prepared");
+      });
+
+      downloadOutput.addEventListener("click", () => {
+        downloadText(`README${state.outputExt}`, output.textContent);
+        showToast("Translation download prepared");
+      });
+
+      document.getElementById("clear-source").addEventListener("click", () => {
+        sourceEditor.value = "";
+        sourceMeta.textContent = "No file · Paste or drop content";
+        dropOverlay.querySelector("strong").textContent = "Drop file to add content";
+        dropOverlay.querySelector("span").textContent = "The editor is empty. The dropped file becomes the source.";
+      });
+
+      document.getElementById("mock-upload").addEventListener("click", () => {
+        showToast("Mock upload selected README.md");
+      });
+
+      ["dragenter", "dragover"].forEach((eventName) => {
+        editorWrap.addEventListener(eventName, (event) => {
+          event.preventDefault();
+          editorWrap.classList.add("dragging");
+          const hasText = sourceEditor.value.trim().length > 0;
+          dropOverlay.querySelector("strong").textContent = hasText
+            ? "Drop file to replace current content"
+            : "Drop file to add content";
+          dropOverlay.querySelector("span").textContent = hasText
+            ? "This editor already has text. The dropped file will overwrite it."
+            : "The editor is empty. The dropped file becomes the source.";
+        });
+      });
+
+      ["dragleave", "drop"].forEach((eventName) => {
+        editorWrap.addEventListener(eventName, (event) => {
+          event.preventDefault();
+          editorWrap.classList.remove("dragging");
+        });
+      });
+
+      editorWrap.addEventListener("drop", () => {
+        sourceEditor.value = "# Dropped file preview\n\nThis prototype shows the replacement state after a file drop.";
+        sourceMeta.textContent = "dropped-file.md · mock";
+        showToast("Mock file content replaced the source");
+      });
+
+      document.getElementById("open-history").addEventListener("click", openHistory);
+      document.getElementById("close-history").addEventListener("click", closeHistory);
+      backdrop.addEventListener("click", closeHistory);
+      window.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") closeHistory();
+      });
+
+      updateDerivedUi();
+    </script>
+  </body>
+</html>

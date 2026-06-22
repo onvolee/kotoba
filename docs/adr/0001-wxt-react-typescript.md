@@ -1,0 +1,3 @@
+# Use WXT, React, and TypeScript for the extension workspace
+
+The first version of Kotoba will use WXT with React and TypeScript for the browser extension and its extension-owned full-tab workspace. WXT owns the extension build and entrypoint model, React fits the stateful split workspace with streaming output, settings routes, drawers, and history restoration, and TypeScript makes translation requests, settings, and history records explicit. We will not use Next.js, Remix, or another full web application framework because the product is an extension page and does not need SSR, server routing, or a server data layer.

@@ -1,0 +1,3 @@
+# Use all_urls host permission for provider requests
+
+Kotoba will request broad host permission for provider requests in the first version so users can configure any OpenAI-compatible Base URL, including public providers, self-hosted gateways, and internal endpoints. The permission is for direct translation requests from the extension-owned workspace, not for webpage translation, content script injection, or reading arbitrary page content. This is a higher-trust permission than provider-specific allowlists, but optional per-host permissions would complicate the first-version settings and translation flow.
