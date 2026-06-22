@@ -11,6 +11,7 @@ describe("extension workspace manifest", () => {
     expect(manifest.action?.default_popup).toBeUndefined();
     expect(manifest.action?.default_title).toBe("Open Kotoba workspace");
     expect(manifest.permissions).toContain("storage");
+    expect(manifest.host_permissions).toEqual(expect.arrayContaining(["http://*/*", "https://*/*"]));
     expect(existsSync(workspacePath)).toBe(true);
   });
 });

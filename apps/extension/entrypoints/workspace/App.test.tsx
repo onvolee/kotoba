@@ -111,16 +111,38 @@ describe("workspace shell", () => {
     expect(screen.getByLabelText("Model")).toHaveValue("example-chat");
   });
 
-  it("tests the current AI provider settings and shows a successful connection result", async () => {
+  it("toggles API key visibility in AI provider settings", async () => {
     const user = userEvent.setup();
 
     render(<App />);
 
     await user.click(await screen.findByRole("button", { name: "Open settings" }));
     await user.click(screen.getByRole("button", { name: /AI settings/ }));
+
+    const apiKeyInput = screen.getByLabelText("API Key");
+    expect(apiKeyInput).toHaveAttribute("type", "password");
+
+    await user.click(screen.getByRole("button", { name: "Show API key" }));
+
+    expect(apiKeyInput).toHaveAttribute("type", "text");
+
+    await user.click(screen.getByRole("button", { name: "Hide API key" }));
+
+    expect(apiKeyInput).toHaveAttribute("type", "password");
+  });
+
+  it("tests the current AI provider settings and persists a successful connection status", async () => {
+    const user = userEvent.setup();
+    const firstRender = render(<App />);
+
+    await user.click(await screen.findByRole("button", { name: "Open settings" }));
+    await user.click(screen.getByRole("button", { name: /AI settings/ }));
     await user.type(screen.getByLabelText("Base URL"), " https://api.example.com/v1/ ");
     await user.type(screen.getByLabelText("API Key"), "sk-real-key");
     await user.type(screen.getByLabelText("Model"), "example-chat");
+    expect(screen.queryByText("Last result")).not.toBeInTheDocument();
+    expect(screen.queryByText("Error handling")).not.toBeInTheDocument();
+
     await user.click(screen.getByRole("button", { name: "Test connection" }));
 
     await waitFor(() => expect(screen.getByText("Connection passed")).toBeInTheDocument());
@@ -129,6 +151,36 @@ describe("workspace shell", () => {
       apiKey: "sk-real-key",
       model: "example-chat",
     });
+
+    firstRender.unmount();
+    window.location.hash = "#settings";
+    resetWorkspaceI18nForTests();
+
+    render(<App />);
+    await user.click(await screen.findByRole("button", { name: /AI settings/ }));
+
+    expect(await screen.findByText("Connection passed")).toBeInTheDocument();
+  });
+
+  it("keeps the saved connection status when settings are edited and saved without testing again", async () => {
+    const user = userEvent.setup();
+
+    render(<App />);
+
+    await user.click(await screen.findByRole("button", { name: "Open settings" }));
+    await user.click(screen.getByRole("button", { name: /AI settings/ }));
+    await user.type(screen.getByLabelText("Base URL"), "https://api.example.com/v1");
+    await user.type(screen.getByLabelText("API Key"), "sk-real-key");
+    await user.type(screen.getByLabelText("Model"), "example-chat");
+    await user.click(screen.getByRole("button", { name: "Test connection" }));
+
+    await waitFor(() => expect(screen.getByText("Connection passed")).toBeInTheDocument());
+    await user.clear(screen.getByLabelText("Model"));
+    await user.type(screen.getByLabelText("Model"), "changed-chat");
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+
+    expect(screen.getByText("Connection passed")).toBeInTheDocument();
+    expect(connectionMocks.testAIConnection).toHaveBeenCalledTimes(1);
   });
 
   it("does not change the workspace language before saving a settings language choice", async () => {
