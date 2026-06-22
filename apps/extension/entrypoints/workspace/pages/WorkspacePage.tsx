@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Component, useState } from "react";
 import {
   ArrowRightLeft,
   Clipboard,
@@ -16,6 +16,7 @@ import { Streamdown } from "streamdown";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import {
   Combobox,
   ComboboxContent,
@@ -69,6 +70,7 @@ type WorkspacePageProps = {
 export function WorkspacePage({ onOpenSettings }: WorkspacePageProps) {
   const { t } = useTranslation();
   const [translationDirection, setTranslationDirection] = useState<TranslationDirection>("en-zh");
+  const [sourceContent, setSourceContent] = useState(sampleSource);
   const [sourceViewFormat, setSourceViewFormat] = useState<ContentFormat>("Markdown");
   const [translationViewFormat, setTranslationViewFormat] = useState<ContentFormat>("Markdown");
   const direction = translationDirections[translationDirection];
@@ -133,12 +135,10 @@ export function WorkspacePage({ onOpenSettings }: WorkspacePageProps) {
           description={t("workspace.panels.source.description")}
           meta="README.md · 3.8 KB"
           headerControl={
-            <WorkspaceCombobox
+            <ContentDisplayModeControl
               ariaLabel={t("workspace.panels.source.formatLabel")}
               value={sourceViewFormat}
               onValueChange={setSourceViewFormat}
-              options={inputTypeOptions}
-              className={compactComboboxClassName}
             />
           }
           footerStatus={t("workspace.panels.source.footerStatus", { format: sourceContentFormatLabel })}
@@ -165,9 +165,10 @@ export function WorkspacePage({ onOpenSettings }: WorkspacePageProps) {
         >
           <ContentViewer
             ariaLabel={t("workspace.panels.source.contentLabel")}
-            content={sampleSource}
+            content={sourceContent}
             contentFormat={sourceContentFormat}
             editable
+            onContentChange={setSourceContent}
             viewFormat={sourceViewFormat}
           />
         </WorkspacePanel>
@@ -179,12 +180,10 @@ export function WorkspacePage({ onOpenSettings }: WorkspacePageProps) {
             model: "deepseek-chat",
           })}
           headerControl={
-            <WorkspaceCombobox
+            <ContentDisplayModeControl
               ariaLabel={t("workspace.panels.translation.formatLabel")}
               value={translationViewFormat}
               onValueChange={setTranslationViewFormat}
-              options={inputTypeOptions}
-              className={compactComboboxClassName}
             />
           }
           footerStatus={t("workspace.panels.translation.footerStatus")}
@@ -239,6 +238,12 @@ type TranslationDirectionButtonProps = {
   target: string;
   ariaLabel: string;
   onSwitch: () => void;
+};
+
+type ContentDisplayModeControlProps = {
+  ariaLabel: string;
+  value: ContentFormat;
+  onValueChange: (value: ContentFormat) => void;
 };
 
 function TranslationDirectionButton({ source, target, ariaLabel, onSwitch }: TranslationDirectionButtonProps) {
@@ -298,28 +303,56 @@ export function WorkspaceCombobox({ ariaLabel, value, onValueChange, options, cl
   );
 }
 
+function ContentDisplayModeControl({ ariaLabel, value, onValueChange }: ContentDisplayModeControlProps) {
+  const { t } = useTranslation();
+
+  return (
+    <div className="inline-flex max-w-full rounded-lg border bg-muted p-1" role="group" aria-label={ariaLabel}>
+      {inputTypeOptions.map((option) => {
+        const isActive = option.value === value;
+
+        return (
+          <button
+            key={option.value}
+            type="button"
+            aria-pressed={isActive}
+            onClick={() => onValueChange(option.value)}
+            className={cn(
+              "h-7 min-w-20 rounded-md px-3 text-sm font-medium whitespace-nowrap outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50",
+              isActive
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            {t(option.labelKey)}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 type ContentViewerProps = {
   ariaLabel?: string;
   content: string;
   contentFormat: ContentFormat;
   editable?: boolean;
+  onContentChange?: (content: string) => void;
   viewFormat: ContentFormat;
 };
 
-export function ContentViewer({ ariaLabel, content, contentFormat, editable = false, viewFormat }: ContentViewerProps) {
-  if (contentFormat === "Plain text" || viewFormat === "Plain text") {
+export function ContentViewer({ ariaLabel, content, contentFormat, editable = false, onContentChange, viewFormat }: ContentViewerProps) {
+  const shouldRenderPlainText = viewFormat === "Plain text";
+  void contentFormat;
+
+  if (shouldRenderPlainText) {
     if (editable) {
       return (
-        <>
-          <label className="sr-only" htmlFor="source-editor">
-            {ariaLabel}
-          </label>
-          <textarea
-            id="source-editor"
-            className="min-h-0 flex-1 resize-none rounded-lg border bg-background p-4 font-mono text-sm leading-6 outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-            defaultValue={content}
-          />
-        </>
+        <SourceEditor
+          ariaLabel={ariaLabel}
+          content={content}
+          onContentChange={onContentChange}
+        />
       );
     }
 
@@ -333,21 +366,103 @@ export function ContentViewer({ ariaLabel, content, contentFormat, editable = fa
     );
   }
 
+  return <MarkdownArticle ariaLabel={ariaLabel} content={content} />;
+}
+
+type SourceEditorProps = {
+  ariaLabel?: string;
+  content: string;
+  onContentChange?: (content: string) => void;
+};
+
+function SourceEditor({ ariaLabel, content, onContentChange }: SourceEditorProps) {
+  return (
+    <>
+      <label className="sr-only" htmlFor="source-editor">
+        {ariaLabel}
+      </label>
+      <textarea
+        id="source-editor"
+        className="min-h-0 flex-1 resize-none rounded-lg border bg-background p-4 font-mono text-sm leading-6 outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+        value={content}
+        onChange={(event) => onContentChange?.(event.target.value)}
+      />
+    </>
+  );
+}
+
+type MarkdownArticleProps = {
+  ariaLabel?: string;
+  content: string;
+};
+
+function MarkdownArticle({ ariaLabel, content }: MarkdownArticleProps) {
+  return (
+    <MarkdownRenderBoundary
+      key={content}
+      fallback={
+        <RawTextArticle
+          ariaLabel={ariaLabel}
+          content={content}
+        />
+      }
+    >
+      <article
+        aria-label={ariaLabel}
+        className="min-h-0 flex-1 overflow-auto rounded-lg border bg-background p-4 text-sm leading-6"
+      >
+        <Streamdown
+          mode="static"
+          controls={false}
+          skipHtml
+          className="space-y-4 [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:font-mono [&_h1]:text-base [&_h1]:font-semibold [&_li]:ml-5 [&_li]:list-disc"
+        >
+          {content}
+        </Streamdown>
+      </article>
+    </MarkdownRenderBoundary>
+  );
+}
+
+type RawTextArticleProps = {
+  ariaLabel?: string;
+  content: string;
+};
+
+function RawTextArticle({ ariaLabel, content }: RawTextArticleProps) {
   return (
     <article
       aria-label={ariaLabel}
-      className="min-h-0 flex-1 overflow-auto rounded-lg border bg-background p-4 text-sm leading-6"
+      className="min-h-0 flex-1 overflow-auto rounded-lg border bg-background p-4 font-mono text-sm leading-6"
     >
-      <Streamdown
-        mode="static"
-        controls={false}
-        skipHtml
-        className="space-y-4 [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:font-mono [&_h1]:text-base [&_h1]:font-semibold [&_li]:ml-5 [&_li]:list-disc"
-      >
-        {content}
-      </Streamdown>
+      <pre className="whitespace-pre-wrap">{content}</pre>
     </article>
   );
+}
+
+type MarkdownRenderBoundaryProps = {
+  children: React.ReactNode;
+  fallback: React.ReactNode;
+};
+
+type MarkdownRenderBoundaryState = {
+  failed: boolean;
+};
+
+class MarkdownRenderBoundary extends Component<MarkdownRenderBoundaryProps, MarkdownRenderBoundaryState> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  render() {
+    if (this.state.failed) {
+      return this.props.fallback;
+    }
+
+    return this.props.children;
+  }
 }
 
 function WorkspacePanel({ title, description, meta, headerControl, footerStatus, actions, children }: WorkspacePanelProps) {

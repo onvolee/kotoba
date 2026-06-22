@@ -38,14 +38,14 @@ const resources = {
           source: {
             contentLabel: "Source content",
             description: "Drag a .md or .txt file onto the editor, upload from the bottom bar, or paste directly.",
-            formatLabel: "Source format",
+            formatLabel: "Source display mode",
             footerStatus: "Input: {{format}}",
             title: "Source",
           },
           translation: {
             copiedToast: "Translation copied",
             downloadFilename: "Download .zh.md",
-            formatLabel: "Translation format",
+            formatLabel: "Translation display mode",
             footerStatus: "Successful translations will be saved locally",
             meta: "Ready · {{style}} · {{model}}",
             title: "Translation",
@@ -154,14 +154,14 @@ const resources = {
           source: {
             contentLabel: "原文内容",
             description: "将 .md 或 .txt 文件拖到编辑器，或从底部上传，也可以直接粘贴。",
-            formatLabel: "原文格式",
+            formatLabel: "原文显示模式",
             footerStatus: "输入：{{format}}",
             title: "原文",
           },
           translation: {
             copiedToast: "译文已复制",
             downloadFilename: "下载 .zh.md",
-            formatLabel: "译文格式",
+            formatLabel: "译文显示模式",
             footerStatus: "成功翻译会保存在本地",
             meta: "就绪 · {{style}} · {{model}}",
             title: "译文",

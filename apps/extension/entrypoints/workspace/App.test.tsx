@@ -30,8 +30,8 @@ describe("workspace shell", () => {
 
     expect(await screen.findByRole("button", { name: "翻译方向：英语到中文" })).toBeInTheDocument();
     expect(within(screen.getByRole("form", { name: "翻译控制" })).getByRole("combobox", { name: "翻译风格" })).toHaveValue("忠实");
-    expect(within(screen.getByRole("region", { name: "原文" })).getByRole("combobox", { name: "原文格式" })).toHaveValue("Markdown");
-    expect(within(screen.getByRole("region", { name: "译文" })).getByRole("combobox", { name: "译文格式" })).toHaveValue("Markdown");
+    expect(within(screen.getByRole("region", { name: "原文" })).getByRole("group", { name: "原文显示模式" })).toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: "译文" })).getByRole("group", { name: "译文显示模式" })).toBeInTheDocument();
     expect(screen.getByText("输入：Markdown")).toBeInTheDocument();
     expect(screen.getByText("成功翻译会保存在本地")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "上传" })).toBeInTheDocument();
@@ -145,13 +145,13 @@ describe("workspace shell", () => {
     expect(screen.getByRole("button", { name: "Open settings" })).toBeInTheDocument();
     expect(within(screen.getByRole("form", { name: "Translation controls" })).getByRole("combobox", { name: "Style preset" })).toHaveValue("Faithful");
     expect(container.querySelector("select")).not.toBeInTheDocument();
-    expect(within(screen.getByRole("region", { name: "Source" })).getByRole("combobox", { name: "Source format" })).toHaveValue("Markdown");
-    expect(within(screen.getByRole("region", { name: "Translation" })).getByRole("combobox", { name: "Translation format" })).toHaveValue("Markdown");
+    expect(getPressedDisplayMode(screen.getByRole("region", { name: "Source" }), "Source display mode")).toHaveTextContent("Markdown");
+    expect(getPressedDisplayMode(screen.getByRole("region", { name: "Translation" }), "Translation display mode")).toHaveTextContent("Markdown");
     expect(screen.getByRole("button", { name: "Upload" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Download .zh.md" })).toBeInTheDocument();
   });
 
-  it("switches Markdown source and translation panels between rendered Markdown and plain text", async () => {
+  it("switches source and translation panels between rendered Markdown and raw text", async () => {
     const user = userEvent.setup();
 
     render(<App />);
@@ -161,19 +161,12 @@ describe("workspace shell", () => {
 
     expect(within(sourcePanel).getByRole("heading", { name: "Release notes" })).toBeInTheDocument();
     expect(within(sourcePanel).getByRole("list")).toHaveTextContent("Preserve lists and headings");
+    expect(within(sourcePanel).queryByRole("textbox", { name: "Source content" })).not.toBeInTheDocument();
     expect(within(translationPanel).getByRole("heading", { name: "发布说明" })).toBeInTheDocument();
     expect(within(translationPanel).getByRole("list")).toHaveTextContent("保留列表和标题");
 
-    await chooseComboboxOption(
-      user,
-      within(sourcePanel).getByRole("combobox", { name: "Source format" }),
-      "Plain text",
-    );
-    await chooseComboboxOption(
-      user,
-      within(translationPanel).getByRole("combobox", { name: "Translation format" }),
-      "Plain text",
-    );
+    await user.click(getDisplayModeButton(sourcePanel, "Source display mode", "Plain text"));
+    await user.click(getDisplayModeButton(translationPanel, "Translation display mode", "Plain text"));
 
     const sourceTextbox = within(sourcePanel).getByRole("textbox", { name: "Source content" });
     expect((sourceTextbox as HTMLTextAreaElement).value).toContain("# Release notes");
@@ -182,7 +175,30 @@ describe("workspace shell", () => {
     expect(within(translationPanel).getByText(/- 保留列表和标题/)).toBeInTheDocument();
   });
 
-  it("keeps plain text unchanged when its view format is switched to Markdown", async () => {
+  it("edits source content as raw text and previews it as Markdown in a single content area", async () => {
+    const user = userEvent.setup();
+
+    render(<App />);
+
+    const sourcePanel = await screen.findByRole("region", { name: "Source" });
+    expect(getPressedDisplayMode(sourcePanel, "Source display mode")).toHaveTextContent("Markdown");
+    expect(within(sourcePanel).queryByRole("textbox", { name: "Source content" })).not.toBeInTheDocument();
+
+    await user.click(getDisplayModeButton(sourcePanel, "Source display mode", "Plain text"));
+    const sourceTextbox = within(sourcePanel).getByRole("textbox", { name: "Source content" });
+    await user.clear(sourceTextbox);
+    await user.type(sourceTextbox, "# Draft title");
+
+    expect(sourceTextbox).toHaveValue("# Draft title");
+    expect(within(sourcePanel).queryByRole("heading", { name: "Draft title" })).not.toBeInTheDocument();
+
+    await user.click(getDisplayModeButton(sourcePanel, "Source display mode", "Markdown"));
+
+    expect(within(sourcePanel).queryByRole("textbox", { name: "Source content" })).not.toBeInTheDocument();
+    expect(within(sourcePanel).getByRole("heading", { name: "Draft title" })).toBeInTheDocument();
+  });
+
+  it("renders content as Markdown when Markdown display mode is selected", async () => {
     render(
       <ContentViewer
         content={"# This is a plain text line\n- This is not a list item"}
@@ -191,10 +207,8 @@ describe("workspace shell", () => {
       />,
     );
 
-    expect(screen.queryByRole("heading", { name: "This is a plain text line" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("list")).not.toBeInTheDocument();
-    expect(screen.getByText(/^# This is a plain text line/)).toBeInTheDocument();
-    expect(screen.getByText(/- This is not a list item/)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "This is a plain text line" })).toBeInTheDocument();
+    expect(screen.getByRole("list")).toHaveTextContent("This is not a list item");
   });
 
   it("switches the translation direction from a single control", async () => {
@@ -210,9 +224,12 @@ describe("workspace shell", () => {
   });
 });
 
-async function chooseComboboxOption(user: ReturnType<typeof userEvent.setup>, combobox: HTMLElement, optionName: string) {
-  await user.click(combobox);
-  await user.click(await screen.findByRole("option", { name: optionName }));
+function getDisplayModeButton(panel: HTMLElement, groupName: string, optionName: string) {
+  return within(within(panel).getByRole("group", { name: groupName })).getByRole("button", { name: optionName });
+}
+
+function getPressedDisplayMode(panel: HTMLElement, groupName: string) {
+  return within(within(panel).getByRole("group", { name: groupName })).getByRole("button", { pressed: true });
 }
 
 function setBrowserLanguage(language: string) {

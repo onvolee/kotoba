@@ -12,6 +12,10 @@ _Avoid_: Popup, side panel, new tab override
 The Markdown or plain text content provided by paste, upload, or drag-and-drop before translation.
 _Avoid_: Document, webpage, corpus
 
+**Content Display Mode**:
+The user's choice to show source content or translation output as raw plain text or rendered Markdown in a single panel content area.
+_Avoid_: Content format, file type, editor mode
+
 **Translation Output**:
 The translated Markdown or plain text generated from source content.
 _Avoid_: Rendered preview, HTML output
