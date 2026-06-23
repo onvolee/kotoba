@@ -53,6 +53,7 @@ const resources = {
         },
         openHistory: "Open translation history",
         openSettings: "Open settings",
+        missingProviderSettings: "Configure AI provider settings before translating.",
         panels: {
           source: {
             contentLabel: "Source content",
@@ -67,6 +68,7 @@ const resources = {
             formatLabel: "Translation display mode",
             footerStatus: "Successful translations will be saved locally",
             meta: "Ready · {{style}} · {{model}}",
+            noModel: "No model configured",
             title: "Translation",
           },
         },
@@ -195,6 +197,7 @@ const resources = {
         },
         openHistory: "打开翻译历史",
         openSettings: "打开设置",
+        missingProviderSettings: "请先配置 AI 服务设置再翻译。",
         panels: {
           source: {
             contentLabel: "原文内容",
@@ -209,6 +212,7 @@ const resources = {
             formatLabel: "译文显示模式",
             footerStatus: "成功翻译会保存在本地",
             meta: "就绪 · {{style}} · {{model}}",
+            noModel: "未配置模型",
             title: "译文",
           },
         },

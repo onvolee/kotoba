@@ -60,6 +60,10 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import {
+  getSavedAISettings,
+  type AISettings,
+} from "../ai-settings";
+import {
   estimateHistoryRecordStorageBytes,
   formatStorageBytes,
   type ContentFormat,
@@ -121,13 +125,17 @@ export function WorkspacePage({ onOpenSettings }: WorkspacePageProps) {
   const translationContentFormat: ContentFormat = "Markdown";
   const sourceContentFormatLabel = t("common.formats.markdown");
   const stylePreset: TranslationStylePreset = "Faithful";
-  const providerSettings = {
-    baseUrl: "http://101.43.64.125:8000/v1",
-    apiKey: "sk-sub-g33qmnkpch841r4emuyy5tug",
-    model: "qwen3.7-plus",
-  };
 
   async function handleTranslate() {
+    const providerSettings = await getSavedAISettings();
+
+    if (!hasCompleteAISettings(providerSettings)) {
+      setTranslationContent("");
+      setTranslationStatus("failed");
+      toast.error(t("workspace.missingProviderSettings"));
+      return;
+    }
+
     setTranslationStatus("streaming");
     setTranslationContent("");
 
@@ -289,7 +297,7 @@ export function WorkspacePage({ onOpenSettings }: WorkspacePageProps) {
           title={t("workspace.panels.translation.title")}
           meta={t("workspace.panels.translation.meta", {
             style: selectedStyleLabel,
-            model: "deepseek-chat",
+            model: t("workspace.panels.translation.noModel"),
           })}
           headerControl={
             <ContentDisplayModeControl
@@ -326,6 +334,10 @@ export function WorkspacePage({ onOpenSettings }: WorkspacePageProps) {
       </section>
     </main>
   );
+}
+
+function hasCompleteAISettings(settings: AISettings): boolean {
+  return Boolean(settings.baseUrl && settings.apiKey && settings.model);
 }
 
 type WorkspacePanelProps = {

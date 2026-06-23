@@ -14,6 +14,10 @@ export type TranslateSourceContentOptions = {
 };
 
 export async function* translateSourceContent(options: TranslateSourceContentOptions): AsyncIterable<string> {
+  if (!hasCompleteAISettings(options.settings)) {
+    throw new Error("Missing AI provider settings");
+  }
+
   const result = streamText({
     model: createOpenAICompatible({
       name: "user-provider",
@@ -28,6 +32,10 @@ export async function* translateSourceContent(options: TranslateSourceContentOpt
   for await (const textPart of result.textStream) {
     yield textPart;
   }
+}
+
+function hasCompleteAISettings(settings: AISettings): boolean {
+  return Boolean(settings.baseUrl && settings.apiKey && settings.model);
 }
 
 function buildTranslationSystemPrompt(options: TranslateSourceContentOptions): string {

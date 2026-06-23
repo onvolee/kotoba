@@ -5,6 +5,7 @@ import { fakeBrowser } from "wxt/testing";
 import App from "./App";
 import { resetWorkspaceI18nForTests } from "./i18n";
 import { ContentViewer } from "./pages/WorkspacePage";
+import { saveAISettings } from "./ai-settings";
 import {
   getSavedTranslationHistoryRecords,
   saveTranslationHistoryRecords,
@@ -376,8 +377,24 @@ describe("workspace shell", () => {
     expect(within(historyDrawer).getByText("Successful translations are saved locally.")).toBeInTheDocument();
   });
 
+  it("does not translate when AI provider settings are missing", async () => {
+    const user = userEvent.setup();
+
+    render(<App />);
+
+    await user.click(await screen.findByRole("button", { name: "Translate" }));
+
+    expect(translationMocks.translateSourceContent).not.toHaveBeenCalled();
+    expect(within(screen.getByRole("region", { name: "Translation" })).queryByRole("heading", { name: "发布说明" })).not.toBeInTheDocument();
+  });
+
   it("streams translation output into the translation panel and saves the completed record to history", async () => {
     const user = userEvent.setup();
+    await saveAISettings({
+      baseUrl: "https://api.example.com/v1",
+      apiKey: "sk-real-key",
+      model: "example-chat",
+    });
     translationMocks.translateSourceContent.mockImplementation(async function* () {
       yield "# 示例文档\n\n";
       yield "这是第一段译文。";
@@ -393,9 +410,9 @@ describe("workspace shell", () => {
       expect.objectContaining({
         sourceContent: expect.stringContaining("Kotoba keeps Markdown structure"),
         settings: expect.objectContaining({
-          baseUrl: "http://101.43.64.125:8000/v1",
-          apiKey: "sk-sub-g33qmnkpch841r4emuyy5tug",
-          model: "qwen3.7-plus",
+          baseUrl: "https://api.example.com/v1",
+          apiKey: "sk-real-key",
+          model: "example-chat",
         }),
       }),
     );
@@ -406,12 +423,17 @@ describe("workspace shell", () => {
 
     expect(historyItem).toHaveTextContent("Release notes");
     expect(historyItem).toHaveTextContent(/Faithful/);
-    expect(historyItem).toHaveTextContent(/qwen3\.7-plus/);
+    expect(historyItem).toHaveTextContent(/example-chat/);
     expect(historyItem).toHaveTextContent(/B|KB|MB/);
   });
 
   it("persists the completed translation record for future workspace loads", async () => {
     const user = userEvent.setup();
+    await saveAISettings({
+      baseUrl: "https://api.example.com/v1",
+      apiKey: "sk-real-key",
+      model: "example-chat",
+    });
     translationMocks.translateSourceContent.mockImplementation(async function* () {
       yield "# 持久化译文";
     });
@@ -549,7 +571,7 @@ function createHistoryRecord(overrides: Partial<TranslationHistoryRecord> = {}):
     translationDirection: "en-zh",
     stylePreset: "Faithful",
     baseUrl: "https://api.example.com/v1",
-    model: "qwen3.7-plus",
+    model: "example-chat",
     createdAt: "2026-06-23T07:12:00.000Z",
     ...overrides,
   };

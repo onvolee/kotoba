@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { translateSourceContent } from "./translation-service";
 
@@ -19,6 +19,12 @@ vi.mock("ai", () => ({
 }));
 
 describe("translation service", () => {
+  beforeEach(() => {
+    aiMocks.chatModel.mockClear();
+    aiMocks.createOpenAICompatible.mockClear();
+    aiMocks.streamText.mockReset();
+  });
+
   it("streams translated text from the configured OpenAI-compatible provider", async () => {
     aiMocks.streamText.mockReturnValue({
       textStream: toAsyncIterable(["# 标题\n\n", "正文"]),
@@ -32,9 +38,9 @@ describe("translation service", () => {
       translationDirection: "en-zh",
       stylePreset: "Faithful",
       settings: {
-        baseUrl: "http://101.43.64.125:8000/v1",
-        apiKey: "sk-sub-g33qmnkpch841r4emuyy5tug",
-        model: "qwen3.7-plus",
+        baseUrl: "https://api.example.com/v1",
+        apiKey: "sk-test-key",
+        model: "example-chat",
       },
     })) {
       chunks.push(chunk);
@@ -43,14 +49,35 @@ describe("translation service", () => {
     expect(chunks).toEqual(["# 标题\n\n", "正文"]);
     expect(aiMocks.createOpenAICompatible).toHaveBeenCalledWith({
       name: "user-provider",
-      baseURL: "http://101.43.64.125:8000/v1",
-      apiKey: "sk-sub-g33qmnkpch841r4emuyy5tug",
+      baseURL: "https://api.example.com/v1",
+      apiKey: "sk-test-key",
     });
-    expect(aiMocks.chatModel).toHaveBeenCalledWith("qwen3.7-plus");
+    expect(aiMocks.chatModel).toHaveBeenCalledWith("example-chat");
     expect(aiMocks.streamText).toHaveBeenCalledWith(expect.objectContaining({
       prompt: "# Title",
       system: expect.stringContaining("Translate English to Simplified Chinese."),
     }));
+  });
+
+  it("rejects missing provider settings before starting a stream", async () => {
+    await expect(async () => {
+      for await (const _chunk of translateSourceContent({
+        sourceContent: "# Title",
+        sourceContentFormat: "Markdown",
+        translationDirection: "en-zh",
+        stylePreset: "Faithful",
+        settings: {
+          baseUrl: "",
+          apiKey: "",
+          model: "",
+        },
+      })) {
+        // Exhaust the stream to surface generator errors.
+      }
+    }).rejects.toThrow("Missing AI provider settings");
+
+    expect(aiMocks.createOpenAICompatible).not.toHaveBeenCalled();
+    expect(aiMocks.streamText).not.toHaveBeenCalled();
   });
 });
 

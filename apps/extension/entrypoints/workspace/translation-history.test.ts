@@ -26,7 +26,7 @@ describe("translation history storage usage", () => {
         translationDirection: "en-zh",
         stylePreset: "Faithful",
         baseUrl: "https://api.example.com/v1",
-        model: "qwen3.7-plus",
+        model: "example-chat",
         createdAt: "2026-06-22T08:30:00.000Z",
       },
     ];
@@ -69,7 +69,7 @@ function createHistoryRecord(overrides: Partial<TranslationHistoryRecord> = {}):
     translationDirection: "en-zh",
     stylePreset: "Faithful",
     baseUrl: "https://api.example.com/v1",
-    model: "qwen3.7-plus",
+    model: "example-chat",
     createdAt: "2026-06-23T07:12:00.000Z",
     ...overrides,
   };
