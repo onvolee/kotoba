@@ -5,6 +5,11 @@ import { fakeBrowser } from "wxt/testing";
 import App from "./App";
 import { resetWorkspaceI18nForTests } from "./i18n";
 import { ContentViewer } from "./pages/WorkspacePage";
+import {
+  getSavedTranslationHistoryRecords,
+  saveTranslationHistoryRecords,
+  type TranslationHistoryRecord,
+} from "./translation-history";
 import { useWorkspaceStore } from "./workspace-store";
 
 const connectionMocks = vi.hoisted(() => ({
@@ -106,9 +111,8 @@ describe("workspace shell", () => {
     await user.click(await screen.findByRole("button", { name: "Open settings" }));
     await user.click(screen.getByRole("button", { name: /Local data/ }));
 
-    expect(screen.getByText("24")).toBeInTheDocument();
     expect(screen.getByText("saved records")).toBeInTheDocument();
-    expect(screen.getByText("0")).toBeInTheDocument();
+    expect(screen.getAllByText("0")).toHaveLength(2);
     expect(screen.getByText("API keys in history")).toBeInTheDocument();
     expect(screen.getByText(/KB|MB|B/)).toBeInTheDocument();
     expect(screen.queryByText("18.4 MB")).not.toBeInTheDocument();
@@ -318,6 +322,13 @@ describe("workspace shell", () => {
 
   it("opens local translation history in a right drawer and restores a record", async () => {
     const user = userEvent.setup();
+    const record = createHistoryRecord({
+      id: "history-api-migration",
+      title: "API migration notes",
+      sourceContent: "# API migration notes",
+      translatedContent: "# API 迁移说明",
+    });
+    useWorkspaceStore.getState().prependHistoryRecord(record);
 
     render(<App />);
 
@@ -325,13 +336,44 @@ describe("workspace shell", () => {
     const historyDrawer = await screen.findByRole("dialog", { name: "Translation history" });
 
     expect(within(historyDrawer).getByRole("heading", { name: "History" })).toBeInTheDocument();
-    expect(within(historyDrawer).getByText("24 saved records")).toBeInTheDocument();
+    expect(within(historyDrawer).getByText("1 saved record")).toBeInTheDocument();
     expect(within(historyDrawer).getByRole("button", { name: /Restore API migration notes/ })).toBeInTheDocument();
 
     await user.click(within(historyDrawer).getByRole("button", { name: /Restore API migration notes/ }));
 
     expect(within(screen.getByRole("region", { name: "Source", hidden: true })).getByRole("heading", { name: "API migration notes", hidden: true })).toBeInTheDocument();
     expect(within(screen.getByRole("region", { name: "Translation", hidden: true })).getByRole("heading", { name: "API 迁移说明", hidden: true })).toBeInTheDocument();
+  });
+
+  it("loads saved translation history when the workspace is opened again", async () => {
+    const user = userEvent.setup();
+    const record = createHistoryRecord({
+      id: "history-reloaded",
+      title: "Reloaded history item",
+    });
+    await saveTranslationHistoryRecords([record]);
+    useWorkspaceStore.getState().resetWorkspaceStateForTests();
+
+    render(<App />);
+
+    await user.click(await screen.findByRole("button", { name: "Open translation history" }));
+    const historyDrawer = await screen.findByRole("dialog", { name: "Translation history" });
+
+    expect(within(historyDrawer).getByText("1 saved record")).toBeInTheDocument();
+    expect(within(historyDrawer).getByRole("button", { name: /Restore Reloaded history item/ })).toBeInTheDocument();
+  });
+
+  it("shows an empty state when translation history has no records", async () => {
+    const user = userEvent.setup();
+
+    render(<App />);
+
+    await user.click(await screen.findByRole("button", { name: "Open translation history" }));
+    const historyDrawer = await screen.findByRole("dialog", { name: "Translation history" });
+
+    expect(within(historyDrawer).getByText("No translations saved yet")).toBeInTheDocument();
+    expect(within(historyDrawer).getByText("Complete a translation and it will appear here with its model, style, and storage size.")).toBeInTheDocument();
+    expect(within(historyDrawer).getByText("Successful translations are saved locally.")).toBeInTheDocument();
   });
 
   it("streams translation output into the translation panel and saves the completed record to history", async () => {
@@ -359,7 +401,60 @@ describe("workspace shell", () => {
     );
     await user.click(screen.getByRole("button", { name: "Open translation history" }));
 
-    expect(within(await screen.findByRole("dialog", { name: "Translation history" })).getByRole("button", { name: /Restore Release notes/ })).toBeInTheDocument();
+    const historyDrawer = await screen.findByRole("dialog", { name: "Translation history" });
+    const historyItem = within(historyDrawer).getByRole("button", { name: /Restore Release notes/ });
+
+    expect(historyItem).toHaveTextContent("Release notes");
+    expect(historyItem).toHaveTextContent(/Faithful/);
+    expect(historyItem).toHaveTextContent(/qwen3\.7-plus/);
+    expect(historyItem).toHaveTextContent(/B|KB|MB/);
+  });
+
+  it("persists the completed translation record for future workspace loads", async () => {
+    const user = userEvent.setup();
+    translationMocks.translateSourceContent.mockImplementation(async function* () {
+      yield "# 持久化译文";
+    });
+
+    render(<App />);
+
+    await user.click(await screen.findByRole("button", { name: "Translate" }));
+
+    await waitFor(async () => {
+      await expect(getSavedTranslationHistoryRecords()).resolves.toEqual([
+        expect.objectContaining({
+          title: "Release notes",
+          translatedContent: "# 持久化译文",
+        }),
+      ]);
+    });
+  });
+
+  it("deletes a translation history record only after confirmation", async () => {
+    const user = userEvent.setup();
+    useWorkspaceStore.getState().prependHistoryRecord(createHistoryRecord({ id: "history-delete", title: "Delete me" }));
+
+    render(<App />);
+
+    await user.click(await screen.findByRole("button", { name: "Open translation history" }));
+    const historyDrawer = await screen.findByRole("dialog", { name: "Translation history" });
+
+    await user.click(within(historyDrawer).getByRole("button", { name: "Delete Delete me" }));
+
+    expect(within(historyDrawer).getByText("Delete me")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Delete record?" })).toBeInTheDocument();
+    expect(screen.getByText("This removes Delete me from local history and cannot be restored.")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Keep record" }));
+
+    expect(screen.queryByRole("heading", { name: "Delete record?" })).not.toBeInTheDocument();
+    expect(within(historyDrawer).getByText("Delete me")).toBeInTheDocument();
+
+    await user.click(within(historyDrawer).getByRole("button", { name: "Delete Delete me" }));
+    await user.click(await screen.findByRole("button", { name: "Delete record" }));
+
+    expect(within(historyDrawer).getByText("0 saved records")).toBeInTheDocument();
+    expect(within(historyDrawer).queryByText("Delete me")).not.toBeInTheDocument();
   });
 
   it("switches source and translation panels between rendered Markdown and raw text", async () => {
@@ -441,6 +536,23 @@ function getDisplayModeButton(panel: HTMLElement, groupName: string, optionName:
 
 function getPressedDisplayMode(panel: HTMLElement, groupName: string) {
   return within(within(panel).getByRole("group", { name: groupName })).getByRole("button", { pressed: true });
+}
+
+function createHistoryRecord(overrides: Partial<TranslationHistoryRecord> = {}): TranslationHistoryRecord {
+  return {
+    id: "history-test-record",
+    title: "History item",
+    sourceContent: "# History item",
+    translatedContent: "# 历史项",
+    sourceContentFormat: "Markdown",
+    translationContentFormat: "Markdown",
+    translationDirection: "en-zh",
+    stylePreset: "Faithful",
+    baseUrl: "https://api.example.com/v1",
+    model: "qwen3.7-plus",
+    createdAt: "2026-06-23T07:12:00.000Z",
+    ...overrides,
+  };
 }
 
 function setBrowserLanguage(language: string) {

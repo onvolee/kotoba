@@ -1,7 +1,7 @@
 import { create } from "zustand";
 
 import {
-  sampleHistoryRecords,
+  saveTranslationHistoryRecords,
   type ContentFormat,
   type TranslationDirection,
   type TranslationHistoryRecord,
@@ -23,7 +23,9 @@ export type WorkspaceState = {
   setSourceViewFormat: (sourceViewFormat: ContentFormat) => void;
   setTranslationViewFormat: (translationViewFormat: ContentFormat) => void;
   setTranslationStatus: (translationStatus: TranslationStatus) => void;
-  prependHistoryRecord: (record: TranslationHistoryRecord) => void;
+  hydrateHistoryRecords: (records: TranslationHistoryRecord[]) => void;
+  prependHistoryRecord: (record: TranslationHistoryRecord) => Promise<void>;
+  deleteHistoryRecord: (recordId: string) => Promise<void>;
   restoreHistoryRecord: (record: TranslationHistoryRecord) => void;
   resetWorkspaceStateForTests: () => void;
 };
@@ -32,7 +34,7 @@ const initialWorkspaceValues = {
   translationDirection: "en-zh" as const,
   sourceViewFormat: "Markdown" as const,
   translationViewFormat: "Markdown" as const,
-  historyRecords: sampleHistoryRecords,
+  historyRecords: [] as TranslationHistoryRecord[],
   translationStatus: "idle" as const,
 };
 
@@ -66,7 +68,27 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   setSourceViewFormat: (sourceViewFormat) => set({ sourceViewFormat }),
   setTranslationViewFormat: (translationViewFormat) => set({ translationViewFormat }),
   setTranslationStatus: (translationStatus) => set({ translationStatus }),
-  prependHistoryRecord: (record) => set((state) => ({ historyRecords: [record, ...state.historyRecords] })),
+  hydrateHistoryRecords: (records) => set({ historyRecords: records }),
+  prependHistoryRecord: async (record) => {
+    let nextRecords: TranslationHistoryRecord[] = [];
+
+    set((state) => {
+      nextRecords = [record, ...state.historyRecords];
+
+      return { historyRecords: nextRecords };
+    });
+    await saveTranslationHistoryRecords(nextRecords);
+  },
+  deleteHistoryRecord: async (recordId) => {
+    let nextRecords: TranslationHistoryRecord[] = [];
+
+    set((state) => {
+      nextRecords = state.historyRecords.filter((record) => record.id !== recordId);
+
+      return { historyRecords: nextRecords };
+    });
+    await saveTranslationHistoryRecords(nextRecords);
+  },
   restoreHistoryRecord: (record) => set({
     translationDirection: record.translationDirection,
     sourceContent: record.sourceContent,

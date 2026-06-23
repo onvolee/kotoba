@@ -4,6 +4,8 @@ import { initWorkspaceI18n } from "./i18n";
 import { SettingsPage } from "./pages/SettingsPage";
 import { WorkspacePage } from "./pages/WorkspacePage";
 import { applySavedThemePreference } from "./theme-preference";
+import { getSavedTranslationHistoryRecords } from "./translation-history";
+import { useWorkspaceStore } from "./workspace-store";
 
 type WorkspaceRoute = "workspace" | "settings";
 
@@ -14,8 +16,13 @@ function App() {
   useEffect(() => {
     let isMounted = true;
 
-    Promise.all([initWorkspaceI18n(), applySavedThemePreference()]).then(() => {
+    Promise.all([
+      initWorkspaceI18n(),
+      applySavedThemePreference(),
+      getSavedTranslationHistoryRecords(),
+    ]).then(([, , savedHistoryRecords]) => {
       if (isMounted) {
+        useWorkspaceStore.getState().hydrateHistoryRecords(savedHistoryRecords);
         setIsI18nReady(true);
       }
     });

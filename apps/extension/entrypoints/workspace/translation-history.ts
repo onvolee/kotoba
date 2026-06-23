@@ -1,3 +1,5 @@
+import { storage } from "wxt/utils/storage";
+
 export type TranslationDirection = "en-zh" | "zh-en";
 export type ContentFormat = "Markdown" | "Plain text";
 export type TranslationStylePreset = "Faithful" | "Natural" | "Polished";
@@ -24,52 +26,30 @@ export type HistoryStorageUsage = {
 };
 
 const storageBudgetBytes = 50 * 1024 * 1024;
+const translationHistoryKey = "local:translation-history";
 
-const primarySampleRecord: TranslationHistoryRecord = {
-  id: "sample-api-migration",
-  title: "API migration notes",
-  sourceContent: `# API migration notes
+export async function getSavedTranslationHistoryRecords(): Promise<TranslationHistoryRecord[]> {
+  const value = await storage.getItem<unknown>(translationHistoryKey, {
+    fallback: [],
+  });
 
-The new translation service streams Markdown output directly into the workspace.
+  if (!Array.isArray(value)) {
+    return [];
+  }
 
-- Preserve code spans like \`streamText\`
-- Keep endpoint names unchanged
-- Save completed output to local history`,
-  translatedContent: `# API 迁移说明
+  return value.flatMap((record) => {
+    const normalizedRecord = normalizeTranslationHistoryRecord(record);
 
-新的翻译服务会将 Markdown 输出直接流式写入工作区。
+    return normalizedRecord ? [normalizedRecord] : [];
+  });
+}
 
-- 保留 \`streamText\` 等代码片段
-- 保持端点名称不变
-- 将完成的输出保存到本地历史`,
-  sourceContentFormat: "Markdown",
-  translationContentFormat: "Markdown",
-  translationDirection: "en-zh",
-  stylePreset: "Faithful",
-  baseUrl: "http://101.43.64.125:8000/v1",
-  model: "qwen3.7-plus",
-  createdAt: "2026-06-22T08:30:00.000Z",
-};
+export async function saveTranslationHistoryRecords(records: TranslationHistoryRecord[]): Promise<TranslationHistoryRecord[]> {
+  const recordsToSave = records.map(toPersistedHistoryRecord);
 
-export const sampleHistoryRecords: TranslationHistoryRecord[] = [
-  primarySampleRecord,
-  ...Array.from({ length: 23 }, (_, index) => {
-    const recordNumber = index + 2;
-
-    return {
-      ...primarySampleRecord,
-      id: `sample-history-${recordNumber}`,
-      title: `Markdown translation sample ${recordNumber}`,
-      sourceContent: `# Markdown translation sample ${recordNumber}
-
-This is seeded local history data for validating the virtualized history list.`,
-      translatedContent: `# Markdown 翻译示例 ${recordNumber}
-
-这是用于验证虚拟历史列表的本地历史测试数据。`,
-      createdAt: new Date(Date.UTC(2026, 5, 22, 8, 30 - recordNumber)).toISOString(),
-    };
-  }),
-];
+  await storage.setItem(translationHistoryKey, recordsToSave);
+  return recordsToSave;
+}
 
 export function estimateHistoryStorageUsage(records: TranslationHistoryRecord[]): HistoryStorageUsage {
   const bytes = new TextEncoder().encode(JSON.stringify(records.map(toPersistedHistoryRecord))).byteLength;
@@ -80,6 +60,10 @@ export function estimateHistoryStorageUsage(records: TranslationHistoryRecord[])
     apiKeysInHistory: countCredentialLeaks(records),
     usageRatio: Math.min(bytes / storageBudgetBytes, 1),
   };
+}
+
+export function estimateHistoryRecordStorageBytes(record: TranslationHistoryRecord): number {
+  return new TextEncoder().encode(JSON.stringify(toPersistedHistoryRecord(record))).byteLength;
 }
 
 export function formatStorageBytes(bytes: number): string {
@@ -110,6 +94,74 @@ function toPersistedHistoryRecord(record: TranslationHistoryRecord) {
     model: record.model,
     createdAt: record.createdAt,
   };
+}
+
+function normalizeTranslationHistoryRecord(value: unknown): TranslationHistoryRecord | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const record = {
+    id: readString(value.id),
+    title: readString(value.title),
+    sourceContent: readString(value.sourceContent),
+    translatedContent: readString(value.translatedContent),
+    sourceContentFormat: readContentFormat(value.sourceContentFormat),
+    translationContentFormat: readContentFormat(value.translationContentFormat),
+    translationDirection: readTranslationDirection(value.translationDirection),
+    stylePreset: readTranslationStylePreset(value.stylePreset),
+    baseUrl: readString(value.baseUrl),
+    model: readString(value.model),
+    createdAt: readString(value.createdAt),
+  };
+
+  if (
+    !record.id
+    || !record.title
+    || !record.sourceContent
+    || !record.translatedContent
+    || !record.sourceContentFormat
+    || !record.translationContentFormat
+    || !record.translationDirection
+    || !record.stylePreset
+    || !record.createdAt
+  ) {
+    return null;
+  }
+
+  return {
+    id: record.id,
+    title: record.title,
+    sourceContent: record.sourceContent,
+    translatedContent: record.translatedContent,
+    sourceContentFormat: record.sourceContentFormat,
+    translationContentFormat: record.translationContentFormat,
+    translationDirection: record.translationDirection,
+    stylePreset: record.stylePreset,
+    baseUrl: record.baseUrl,
+    model: record.model,
+    createdAt: record.createdAt,
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function readString(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
+function readContentFormat(value: unknown): ContentFormat | null {
+  return value === "Markdown" || value === "Plain text" ? value : null;
+}
+
+function readTranslationDirection(value: unknown): TranslationDirection | null {
+  return value === "en-zh" || value === "zh-en" ? value : null;
+}
+
+function readTranslationStylePreset(value: unknown): TranslationStylePreset | null {
+  return value === "Faithful" || value === "Natural" || value === "Polished" ? value : null;
 }
 
 function countCredentialLeaks(records: TranslationHistoryRecord[]): number {

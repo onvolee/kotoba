@@ -27,7 +27,8 @@ import { testAIConnection } from "../ai-connection";
 import { getSavedAISettings, saveAIConnectionStatus, saveAISettings, type AIConnectionStatus, type AISettings } from "../ai-settings";
 import { applyUiLanguagePreference, getSavedUiLanguagePreference, type UiLanguagePreference } from "../i18n";
 import { applyThemePreference, getSavedThemePreference, type WorkspaceThemePreference } from "../theme-preference";
-import { estimateHistoryStorageUsage, formatStorageBytes, sampleHistoryRecords } from "../translation-history";
+import { estimateHistoryStorageUsage, formatStorageBytes } from "../translation-history";
+import { useWorkspaceStore } from "../workspace-store";
 
 type SettingsModule = "ai" | "local-data" | "performance";
 
@@ -267,7 +268,8 @@ function toAISettings(settings: AISettings): AISettings {
 
 function LocalDataModule() {
   const { t } = useTranslation();
-  const usage = estimateHistoryStorageUsage(sampleHistoryRecords);
+  const historyRecords = useWorkspaceStore((state) => state.historyRecords);
+  const usage = estimateHistoryStorageUsage(historyRecords);
 
   return (
     <ModuleShell

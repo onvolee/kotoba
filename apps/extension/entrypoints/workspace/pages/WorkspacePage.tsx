@@ -22,9 +22,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
   Card,
-  CardContent,
   CardDescription,
-  CardHeader,
   CardTitle,
 } from "@/components/ui/card";
 import {
@@ -46,6 +44,24 @@ import {
   ComboboxList,
 } from "@/components/ui/combobox";
 import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import {
+  Popover,
+  PopoverContent,
+  PopoverDescription,
+  PopoverHeader,
+  PopoverTitle,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  estimateHistoryRecordStorageBytes,
+  formatStorageBytes,
   type ContentFormat,
   type TranslationDirection,
   type TranslationHistoryRecord,
@@ -94,6 +110,7 @@ export function WorkspacePage({ onOpenSettings }: WorkspacePageProps) {
     setTranslationViewFormat,
     setTranslationStatus,
     prependHistoryRecord,
+    deleteHistoryRecord,
     restoreHistoryRecord,
   } = useWorkspaceStore();
   const direction = translationDirections[translationDirection];
@@ -142,7 +159,7 @@ export function WorkspacePage({ onOpenSettings }: WorkspacePageProps) {
         createdAt: new Date().toISOString(),
       };
 
-      prependHistoryRecord(completedRecord);
+      await prependHistoryRecord(completedRecord);
       setTranslationStatus("completed");
     } catch {
       setTranslationStatus("failed");
@@ -208,6 +225,7 @@ export function WorkspacePage({ onOpenSettings }: WorkspacePageProps) {
                   restoreHistoryRecord(record);
                   setIsHistoryOpen(false);
                 }}
+                onDeleteRecord={deleteHistoryRecord}
               />
             </DrawerContent>
           </Drawer>
@@ -344,6 +362,7 @@ type ContentDisplayModeControlProps = {
 type TranslationHistoryDrawerProps = {
   records: TranslationHistoryRecord[];
   onRestoreRecord: (record: TranslationHistoryRecord) => void;
+  onDeleteRecord: (recordId: string) => void;
 };
 
 function TranslationDirectionButton({ source, target, ariaLabel, onSwitch }: TranslationDirectionButtonProps) {
@@ -432,13 +451,13 @@ function ContentDisplayModeControl({ ariaLabel, value, onValueChange }: ContentD
   );
 }
 
-function TranslationHistoryDrawer({ records, onRestoreRecord }: TranslationHistoryDrawerProps) {
+function TranslationHistoryDrawer({ records, onDeleteRecord, onRestoreRecord }: TranslationHistoryDrawerProps) {
   const { i18n, t } = useTranslation();
   const parentRef = useRef<HTMLDivElement | null>(null);
   const rowVirtualizer = useVirtualizer({
     count: records.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 112,
+    estimateSize: () => 128,
     overscan: 5,
   });
 
@@ -471,40 +490,156 @@ function TranslationHistoryDrawer({ records, onRestoreRecord }: TranslationHisto
 
       <ScrollArea viewportRef={parentRef} className="min-h-0 flex-1 overscroll-contain">
         <div className="px-3 py-3">
-          <div
-            className="relative w-full"
-            // style={{ height: `${rowVirtualizer.getTotalSize()}px` }}
-          >
-            {(rowVirtualizer.getVirtualItems().length > 0
-              ? rowVirtualizer.getVirtualItems()
-              : records.slice(0, 8).map((_, index) => ({
-                  key: records[index].id,
-                  index,
-                  size: 112,
-                  start: index * 112,
-                }))
-            ).map((virtualItem) => {
-              const record = records[virtualItem.index];
+          {records.length === 0 ? (
+            <TranslationHistoryEmptyState />
+          ) : (
+            <div
+              className="relative w-full"
+              // style={{ height: `${rowVirtualizer.getTotalSize()}px` }}
+            >
+              {(rowVirtualizer.getVirtualItems().length > 0
+                ? rowVirtualizer.getVirtualItems()
+                : records.slice(0, 8).map((_, index) => ({
+                    key: records[index].id,
+                    index,
+                    size: 112,
+                    start: index * 112,
+                  }))
+              ).map((virtualItem) => {
+                const record = records[virtualItem.index];
+                const storageSize = formatStorageBytes(estimateHistoryRecordStorageBytes(record));
 
-              return (
-                <div
-                  key={record.id}
-                >
-                  <Card size="sm" className="mx-0 mb-3 rounded-lg py-0">
-                    <CardHeader className="px-3 py-3">
-                      <CardTitle className="truncate text-sm">{record.title}</CardTitle>
-                      <CardDescription className="truncate text-xs">
-                        {formatHistoryDate(record.createdAt, i18n.language)} · {record.stylePreset} · {record.model}
-                      </CardDescription>
-                    </CardHeader>
-                  </Card>
-                </div>
-              );
-            })}
-          </div>
+                return (
+                  <div
+                    key={record.id}
+                  >
+                    <Card size="sm" className="group/history mx-0 mb-3 rounded-lg border border-border/70 bg-card py-0 shadow-none transition-colors hover:bg-muted/35">
+                      <div className="flex min-w-0 items-start gap-2 p-3.5">
+                        <button
+                          type="button"
+                          className="min-w-0 flex-1 rounded-md text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                          aria-label={t("workspace.history.restoreRecord", { title: record.title })}
+                          onClick={() => onRestoreRecord(record)}
+                        >
+                          <CardTitle className="truncate text-[0.95rem] leading-5">{record.title}</CardTitle>
+                          <CardDescription className="mt-1 truncate text-xs leading-5">
+                            {formatHistoryDate(record.createdAt, i18n.language)} · {record.stylePreset}
+                          </CardDescription>
+                          <div className="mt-2 flex min-w-0 flex-wrap items-center gap-1.5">
+                            <span className="max-w-full truncate rounded-md border border-border/60 bg-background/70 px-1.5 py-0.5 text-xs text-muted-foreground" translate="no">
+                              {record.model}
+                            </span>
+                            <span className="rounded-md border border-border/60 bg-background/70 px-1.5 py-0.5 text-xs tabular-nums text-muted-foreground">
+                              {storageSize}
+                            </span>
+                          </div>
+                        </button>
+                        <DeleteHistoryRecordPopover
+                          record={record}
+                          onDeleteRecord={onDeleteRecord}
+                        />
+                      </div>
+                    </Card>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </ScrollArea>
     </>
+  );
+}
+
+function DeleteHistoryRecordPopover({
+  record,
+  onDeleteRecord,
+}: {
+  record: TranslationHistoryRecord;
+  onDeleteRecord: (recordId: string) => void;
+}) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const popoverContainerRef = useRef<HTMLDivElement | null>(null);
+
+  return (
+    <div ref={popoverContainerRef}>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger
+          render={
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className="mt-0.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive focus-visible:ring-destructive/20 aria-expanded:bg-destructive/10 aria-expanded:text-destructive"
+              aria-label={t("workspace.history.deleteRecord", { title: record.title })}
+            />
+          }
+        >
+          <Trash2 aria-hidden="true" />
+        </PopoverTrigger>
+        <PopoverContent
+          align="end"
+          side="left"
+          sideOffset={8}
+          portalContainer={popoverContainerRef}
+          className="w-72 gap-3 p-3"
+        >
+          <PopoverHeader>
+            <PopoverTitle>{t("workspace.history.deleteConfirmTitle")}</PopoverTitle>
+            <PopoverDescription className="break-words text-xs leading-5">
+              {t("workspace.history.deleteConfirmDescription", { title: record.title })}
+            </PopoverDescription>
+          </PopoverHeader>
+          <div className="flex items-center justify-end gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setOpen(false)}
+            >
+              {t("workspace.history.cancelDelete")}
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              onClick={() => {
+                onDeleteRecord(record.id);
+                setOpen(false);
+              }}
+            >
+              <Trash2 data-icon="inline-start" />
+              {t("workspace.history.confirmDelete")}
+            </Button>
+          </div>
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}
+
+function TranslationHistoryEmptyState() {
+  const { t } = useTranslation();
+
+  return (
+    <Empty className="min-h-[24rem] rounded-lg border bg-muted/20 px-5">
+      <EmptyHeader>
+        <EmptyMedia variant="icon" className="relative size-10 bg-background text-muted-foreground ring-1 ring-border">
+          <FileText aria-hidden="true" />
+          <span className="absolute -right-1 -bottom-1 flex size-5 items-center justify-center rounded-md bg-primary text-primary-foreground ring-2 ring-background">
+            <Languages aria-hidden="true" />
+          </span>
+        </EmptyMedia>
+        <EmptyTitle className="text-base text-pretty">{t("workspace.history.emptyTitle")}</EmptyTitle>
+        <EmptyDescription>{t("workspace.history.emptyDescription")}</EmptyDescription>
+      </EmptyHeader>
+      <EmptyContent>
+        <div className="rounded-md border bg-background/70 px-2.5 py-1.5 text-xs text-muted-foreground">
+          {t("workspace.history.emptyHint")}
+        </div>
+      </EmptyContent>
+    </Empty>
   );
 }
 
