@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { initWorkspaceI18n } from "./i18n";
 import { SettingsPage } from "./pages/SettingsPage";
 import { WorkspacePage } from "./pages/WorkspacePage";
+import { applySavedThemePreference } from "./theme-preference";
 
 type WorkspaceRoute = "workspace" | "settings";
 
@@ -13,7 +14,7 @@ function App() {
   useEffect(() => {
     let isMounted = true;
 
-    initWorkspaceI18n().then(() => {
+    Promise.all([initWorkspaceI18n(), applySavedThemePreference()]).then(() => {
       if (isMounted) {
         setIsI18nReady(true);
       }

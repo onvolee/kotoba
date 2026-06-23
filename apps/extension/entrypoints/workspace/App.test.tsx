@@ -5,13 +5,22 @@ import { fakeBrowser } from "wxt/testing";
 import App from "./App";
 import { resetWorkspaceI18nForTests } from "./i18n";
 import { ContentViewer } from "./pages/WorkspacePage";
+import { useWorkspaceStore } from "./workspace-store";
 
 const connectionMocks = vi.hoisted(() => ({
   testAIConnection: vi.fn(),
 }));
 
+const translationMocks = vi.hoisted(() => ({
+  translateSourceContent: vi.fn(),
+}));
+
 vi.mock("./ai-connection", () => ({
   testAIConnection: connectionMocks.testAIConnection,
+}));
+
+vi.mock("./translation-service", () => ({
+  translateSourceContent: translationMocks.translateSourceContent,
 }));
 
 describe("workspace shell", () => {
@@ -20,6 +29,11 @@ describe("workspace shell", () => {
     fakeBrowser.reset();
     connectionMocks.testAIConnection.mockReset();
     connectionMocks.testAIConnection.mockResolvedValue({ ok: true });
+    translationMocks.translateSourceContent.mockReset();
+    translationMocks.translateSourceContent.mockImplementation(async function* () {
+      yield "# 默认译文";
+    });
+    useWorkspaceStore.getState().resetWorkspaceStateForTests();
     setBrowserLanguage("en-US");
     resetWorkspaceI18nForTests();
   });
@@ -82,6 +96,22 @@ describe("workspace shell", () => {
     expect(screen.getByRole("group", { name: "UI language" })).toBeInTheDocument();
     expect(screen.getByRole("group", { name: "Theme" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Back to workspace" })).toHaveAttribute("href", "#");
+  });
+
+  it("shows local history storage usage from the current history data", async () => {
+    const user = userEvent.setup();
+
+    render(<App />);
+
+    await user.click(await screen.findByRole("button", { name: "Open settings" }));
+    await user.click(screen.getByRole("button", { name: /Local data/ }));
+
+    expect(screen.getByText("24")).toBeInTheDocument();
+    expect(screen.getByText("saved records")).toBeInTheDocument();
+    expect(screen.getByText("0")).toBeInTheDocument();
+    expect(screen.getByText("API keys in history")).toBeInTheDocument();
+    expect(screen.getByText(/KB|MB|B/)).toBeInTheDocument();
+    expect(screen.queryByText("18.4 MB")).not.toBeInTheDocument();
   });
 
   it("saves AI provider settings and shows them when settings is opened again", async () => {
@@ -228,6 +258,26 @@ describe("workspace shell", () => {
     expect(screen.getByRole("button", { name: "打开设置" })).toBeInTheDocument();
   });
 
+  it("applies and persists the selected workspace theme after saving settings", async () => {
+    const user = userEvent.setup();
+    const firstRender = render(<App />);
+
+    await user.click(await screen.findByRole("button", { name: "Open settings" }));
+    await user.click(screen.getByRole("button", { name: "Dark" }));
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+
+    expect(document.documentElement).toHaveClass("dark");
+
+    firstRender.unmount();
+    window.location.hash = "#settings";
+    resetWorkspaceI18nForTests();
+
+    render(<App />);
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "Dark" })).toHaveAttribute("aria-pressed", "true"));
+    expect(document.documentElement).toHaveClass("dark");
+  });
+
   it("shows the saved settings language choice when settings is opened again", async () => {
     const user = userEvent.setup();
     const firstRender = render(<App />);
@@ -251,13 +301,65 @@ describe("workspace shell", () => {
     expect(await screen.findByRole("button", { name: "Translate" })).toBeInTheDocument();
     expect(screen.getByRole("banner")).toHaveTextContent("Kotoba");
     expect(screen.getByRole("button", { name: "Translation direction: English to Chinese" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Open settings" })).toBeInTheDocument();
+    const historyButton = screen.getByRole("button", { name: "Open translation history" });
+    const settingsButton = screen.getByRole("button", { name: "Open settings" });
+    expect(historyButton).toBeInTheDocument();
+    expect(settingsButton).toBeInTheDocument();
+    expect(
+      historyButton.compareDocumentPosition(settingsButton) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
     expect(within(screen.getByRole("form", { name: "Translation controls" })).getByRole("combobox", { name: "Style preset" })).toHaveValue("Faithful");
     expect(container.querySelector("select")).not.toBeInTheDocument();
     expect(getPressedDisplayMode(screen.getByRole("region", { name: "Source" }), "Source display mode")).toHaveTextContent("Markdown");
     expect(getPressedDisplayMode(screen.getByRole("region", { name: "Translation" }), "Translation display mode")).toHaveTextContent("Markdown");
     expect(screen.getByRole("button", { name: "Upload" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Download .zh.md" })).toBeInTheDocument();
+  });
+
+  it("opens local translation history in a right drawer and restores a record", async () => {
+    const user = userEvent.setup();
+
+    render(<App />);
+
+    await user.click(await screen.findByRole("button", { name: "Open translation history" }));
+    const historyDrawer = await screen.findByRole("dialog", { name: "Translation history" });
+
+    expect(within(historyDrawer).getByRole("heading", { name: "History" })).toBeInTheDocument();
+    expect(within(historyDrawer).getByText("24 saved records")).toBeInTheDocument();
+    expect(within(historyDrawer).getByRole("button", { name: /Restore API migration notes/ })).toBeInTheDocument();
+
+    await user.click(within(historyDrawer).getByRole("button", { name: /Restore API migration notes/ }));
+
+    expect(within(screen.getByRole("region", { name: "Source", hidden: true })).getByRole("heading", { name: "API migration notes", hidden: true })).toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: "Translation", hidden: true })).getByRole("heading", { name: "API 迁移说明", hidden: true })).toBeInTheDocument();
+  });
+
+  it("streams translation output into the translation panel and saves the completed record to history", async () => {
+    const user = userEvent.setup();
+    translationMocks.translateSourceContent.mockImplementation(async function* () {
+      yield "# 示例文档\n\n";
+      yield "这是第一段译文。";
+    });
+
+    render(<App />);
+
+    await user.click(await screen.findByRole("button", { name: "Translate" }));
+
+    expect(await within(screen.getByRole("region", { name: "Translation" })).findByRole("heading", { name: "示例文档" })).toBeInTheDocument();
+    expect(await within(screen.getByRole("region", { name: "Translation" })).findByText("这是第一段译文。")).toBeInTheDocument();
+    expect(translationMocks.translateSourceContent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sourceContent: expect.stringContaining("Kotoba keeps Markdown structure"),
+        settings: expect.objectContaining({
+          baseUrl: "http://101.43.64.125:8000/v1",
+          apiKey: "sk-sub-g33qmnkpch841r4emuyy5tug",
+          model: "qwen3.7-plus",
+        }),
+      }),
+    );
+    await user.click(screen.getByRole("button", { name: "Open translation history" }));
+
+    expect(within(await screen.findByRole("dialog", { name: "Translation history" })).getByRole("button", { name: /Restore Release notes/ })).toBeInTheDocument();
   });
 
   it("switches source and translation panels between rendered Markdown and raw text", async () => {

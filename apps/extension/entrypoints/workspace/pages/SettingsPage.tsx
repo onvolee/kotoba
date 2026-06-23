@@ -15,6 +15,7 @@ import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Progress, ProgressLabel } from "@/components/ui/progress";
 import {
   InputGroup,
   InputGroupAddon,
@@ -25,6 +26,8 @@ import { cn } from "@/lib/utils";
 import { testAIConnection } from "../ai-connection";
 import { getSavedAISettings, saveAIConnectionStatus, saveAISettings, type AIConnectionStatus, type AISettings } from "../ai-settings";
 import { applyUiLanguagePreference, getSavedUiLanguagePreference, type UiLanguagePreference } from "../i18n";
+import { applyThemePreference, getSavedThemePreference, type WorkspaceThemePreference } from "../theme-preference";
+import { estimateHistoryStorageUsage, formatStorageBytes, sampleHistoryRecords } from "../translation-history";
 
 type SettingsModule = "ai" | "local-data" | "performance";
 
@@ -264,6 +267,7 @@ function toAISettings(settings: AISettings): AISettings {
 
 function LocalDataModule() {
   const { t } = useTranslation();
+  const usage = estimateHistoryStorageUsage(sampleHistoryRecords);
 
   return (
     <ModuleShell
@@ -274,20 +278,15 @@ function LocalDataModule() {
     >
       <section className="flex flex-col gap-4 p-4 md:p-6" aria-label={t("settings.localData.storageEstimate")}>
         <div className="grid gap-3 md:grid-cols-3">
-          <MetricCard value="18.4 MB" label={t("settings.localData.historyStorage")} />
-          <MetricCard value="42" label={t("settings.localData.savedRecords")} />
-          <MetricCard value="0" label={t("settings.localData.apiKeysInHistory")} />
+          <MetricCard value={formatStorageBytes(usage.bytes)} label={t("settings.localData.historyStorage")} />
+          <MetricCard value={String(usage.recordCount)} label={t("settings.localData.savedRecords")} />
+          <MetricCard value={String(usage.apiKeysInHistory)} label={t("settings.localData.apiKeysInHistory")} />
         </div>
 
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center justify-between gap-3 text-sm">
-            <span className="font-medium">{t("settings.localData.storageUsageMeter")}</span>
-            <span className="text-muted-foreground">{t("settings.localData.estimateOnly")}</span>
-          </div>
-          <div className="h-2 overflow-hidden rounded-full bg-muted">
-            <div className="h-full w-1/3 rounded-full bg-primary" />
-          </div>
-        </div>
+        <Progress value={Math.round(usage.usageRatio * 100)}>
+          <ProgressLabel>{t("settings.localData.storageUsageMeter")}</ProgressLabel>
+          <span className="ml-auto text-sm text-muted-foreground tabular-nums">{t("settings.localData.estimateOnly")}</span>
+        </Progress>
       </section>
     </ModuleShell>
   );
@@ -296,13 +295,15 @@ function LocalDataModule() {
 function PerformanceModule() {
   const { t } = useTranslation();
   const [uiLanguagePreference, setUiLanguagePreference] = useState<UiLanguagePreference>("browser");
+  const [themePreference, setThemePreference] = useState<WorkspaceThemePreference>("Light");
 
   useEffect(() => {
     let isMounted = true;
 
-    getSavedUiLanguagePreference().then((preference) => {
+    Promise.all([getSavedUiLanguagePreference(), getSavedThemePreference()]).then(([languagePreference, savedThemePreference]) => {
       if (isMounted) {
-        setUiLanguagePreference(preference);
+        setUiLanguagePreference(languagePreference);
+        setThemePreference(savedThemePreference);
       }
     });
 
@@ -341,12 +342,19 @@ function PerformanceModule() {
               { value: "Light", label: t("settings.preferences.light") },
               { value: "Dark", label: t("settings.preferences.dark") },
             ]}
-            activeOption="Light"
+            activeOption={themePreference}
+            onChange={(value) => setThemePreference(value as WorkspaceThemePreference)}
           />
         </PreferenceRow>
 
         <div className="flex justify-end border-t pt-4">
-          <Button type="button" onClick={() => applyUiLanguagePreference(uiLanguagePreference)}>
+          <Button
+            type="button"
+            onClick={() => {
+              void applyUiLanguagePreference(uiLanguagePreference);
+              void applyThemePreference(themePreference);
+            }}
+          >
             {t("settings.saveChanges")}
           </Button>
         </div>

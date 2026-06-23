@@ -33,6 +33,16 @@ const resources = {
           chinese: "Chinese",
           english: "English",
         },
+        history: {
+          ariaLabel: "Translation history",
+          close: "Close translation history",
+          recordCount_one: "{{count}} saved record",
+          recordCount_other: "{{count}} saved records",
+          restore: "Restore",
+          restoreRecord: "Restore {{title}}",
+          title: "History",
+        },
+        openHistory: "Open translation history",
         openSettings: "Open settings",
         panels: {
           source: {
@@ -156,6 +166,16 @@ const resources = {
           chinese: "中文",
           english: "英语",
         },
+        history: {
+          ariaLabel: "翻译历史",
+          close: "关闭翻译历史",
+          recordCount_one: "{{count}} 条已保存记录",
+          recordCount_other: "{{count}} 条已保存记录",
+          restore: "恢复",
+          restoreRecord: "恢复 {{title}}",
+          title: "历史",
+        },
+        openHistory: "打开翻译历史",
         openSettings: "打开设置",
         panels: {
           source: {
