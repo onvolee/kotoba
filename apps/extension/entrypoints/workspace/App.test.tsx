@@ -368,6 +368,30 @@ describe("workspace shell", () => {
     expect(within(sourcePanel).getByText("Source from drag and drop.")).toBeInTheDocument();
   });
 
+  it("shows a page-level file drop overlay and loads the dropped source file", async () => {
+    const file = new File(["# Page drop\n\nLoaded from the workspace shell."], "page-drop.md", {
+      type: "text/markdown",
+    });
+
+    render(<App />);
+
+    await screen.findByRole("button", { name: "Translate" });
+    fireEvent.dragEnter(screen.getByRole("main"), {
+      dataTransfer: createFileDataTransfer(file),
+    });
+
+    expect(screen.getByText("Release to load file")).toBeInTheDocument();
+    expect(screen.getByText("The file will replace the current Source input. Markdown and plain text files are supported.")).toBeInTheDocument();
+
+    fireEvent.drop(screen.getByRole("main"), {
+      dataTransfer: createFileDataTransfer(file),
+    });
+
+    expect(screen.queryByText("Release to load file")).not.toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Page drop" })).toBeInTheDocument();
+    expect(screen.getByText("Loaded from the workspace shell.")).toBeInTheDocument();
+  });
+
   it("opens local translation history in a right drawer and restores a record", async () => {
     const user = userEvent.setup();
     const record = createHistoryRecord({
@@ -674,6 +698,15 @@ async function setSourceMarkdown(user: ReturnType<typeof userEvent.setup>, conte
   await user.click(getDisplayModeButton(sourcePanel, "Source display mode", "Plain text"));
   await user.clear(within(sourcePanel).getByRole("textbox", { name: "Source content" }));
   await user.type(within(sourcePanel).getByRole("textbox", { name: "Source content" }), content);
+}
+
+function createFileDataTransfer(file: File) {
+  return {
+    files: [file],
+    items: [{ kind: "file", getAsFile: () => file }],
+    types: ["Files"],
+    dropEffect: "none",
+  };
 }
 
 function createHistoryRecord(overrides: Partial<TranslationHistoryRecord> = {}): TranslationHistoryRecord {

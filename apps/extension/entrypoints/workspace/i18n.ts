@@ -33,6 +33,11 @@ const resources = {
           chinese: "Chinese",
           english: "English",
         },
+        fileDrop: {
+          description: "The file will replace the current Source input. Markdown and plain text files are supported.",
+          meta: ".md · .markdown · .txt",
+          title: "Release to load file",
+        },
         history: {
           ariaLabel: "Translation history",
           cancelDelete: "Keep record",
@@ -183,6 +188,11 @@ const resources = {
           ariaLabel: "翻译方向：{{source}}到{{target}}",
           chinese: "中文",
           english: "英语",
+        },
+        fileDrop: {
+          description: "内容会放进原文面板，当前输入将被替换。支持 Markdown 和纯文本。",
+          meta: ".md · .markdown · .txt",
+          title: "松手后读取文件",
         },
         history: {
           ariaLabel: "翻译历史",

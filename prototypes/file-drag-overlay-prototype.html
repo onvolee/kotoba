@@ -1,0 +1,1038 @@
+<!doctype html>
+<!--
+  PROTOTYPE - wipe me.
+  Question: What should the file drag-in interaction feel like in the Kotoba translation workspace?
+  Three overlay variants on one prototype route, switchable via ?variant=A|B|C.
+
+  Design plan:
+  Subject: Kotoba's extension workspace for people translating Markdown/text files.
+  Job: make file drag-in feel obvious, calm, and reversible before the drop lands in the source panel.
+  Palette: washi #f7f5ec, sumi #1f2522, ink-wash #53615b, scanner-blue #285f73, stamp-red #b35a46, source-green #6d8062.
+  Type: restrained system sans for UI, Georgia as the small Kotoba wordmark accent, SF Mono for text/file states.
+  Signature: the dragged file becomes a "sheet on the translation desk" rather than a generic dashed drop zone.
+-->
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Kotoba file drag overlay prototype</title>
+    <style>
+      :root {
+        --washi: #f7f5ec;
+        --paper: #fffefa;
+        --sumi: #1f2522;
+        --ink-wash: #53615b;
+        --line: #d9d5c7;
+        --scanner-blue: #285f73;
+        --scanner-blue-deep: #123f4c;
+        --stamp-red: #b35a46;
+        --source-green: #6d8062;
+        --shadow: 0 24px 70px rgba(31, 37, 34, 0.18);
+        color-scheme: light;
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        min-width: 980px;
+        min-height: 100vh;
+        margin: 0;
+        background:
+          linear-gradient(90deg, rgba(31, 37, 34, 0.035) 1px, transparent 1px) 0 0 / 28px 28px,
+          linear-gradient(0deg, rgba(31, 37, 34, 0.025) 1px, transparent 1px) 0 0 / 28px 28px,
+          var(--washi);
+        color: var(--sumi);
+      }
+
+      button,
+      textarea {
+        font: inherit;
+      }
+
+      button {
+        border: 0;
+        cursor: pointer;
+      }
+
+      .app {
+        min-height: 100vh;
+      }
+
+      .topbar {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        display: grid;
+        grid-template-columns: minmax(220px, 1fr) auto minmax(220px, 1fr);
+        align-items: center;
+        gap: 18px;
+        min-height: 68px;
+        padding: 0 24px;
+        border-bottom: 1px solid var(--line);
+        background: rgba(247, 245, 236, 0.94);
+        backdrop-filter: blur(18px);
+      }
+
+      .brand {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+        min-width: 0;
+      }
+
+      .brand strong {
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: 24px;
+        letter-spacing: 0;
+      }
+
+      .brand span {
+        overflow: hidden;
+        color: var(--ink-wash);
+        font-size: 13px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .center-controls,
+      .right-controls {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+      }
+
+      .center-controls {
+        justify-content: center;
+      }
+
+      .right-controls {
+        justify-content: flex-end;
+      }
+
+      .language-pill,
+      .chip,
+      .icon-button,
+      .primary-button,
+      .ghost-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 36px;
+        border-radius: 999px;
+        white-space: nowrap;
+      }
+
+      .language-pill {
+        gap: 11px;
+        min-width: 260px;
+        border: 1px solid var(--line);
+        background: var(--paper);
+        padding: 0 13px;
+        color: var(--sumi);
+        font-size: 13px;
+      }
+
+      .language-pill svg,
+      .icon-button svg,
+      .primary-button svg,
+      .ghost-button svg {
+        width: 17px;
+        height: 17px;
+      }
+
+      .chip {
+        border: 1px solid var(--line);
+        background: var(--paper);
+        padding: 0 13px;
+        color: var(--sumi);
+        font-size: 13px;
+      }
+
+      .primary-button {
+        gap: 7px;
+        background: var(--scanner-blue);
+        padding: 0 16px;
+        color: #fffefa;
+        font-size: 13px;
+        font-weight: 720;
+      }
+
+      .ghost-button {
+        gap: 7px;
+        border: 1px solid var(--line);
+        background: transparent;
+        padding: 0 13px;
+        color: var(--sumi);
+        font-size: 13px;
+      }
+
+      .icon-button {
+        width: 38px;
+        border: 1px solid transparent;
+        background: transparent;
+        color: var(--sumi);
+      }
+
+      .workspace {
+        position: relative;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 18px;
+        height: calc(100vh - 68px);
+        min-height: 650px;
+        padding: 22px;
+      }
+
+      .panel {
+        display: flex;
+        min-height: 0;
+        flex-direction: column;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--paper);
+        box-shadow: 0 1px 0 rgba(31, 37, 34, 0.04);
+      }
+
+      .panel-header,
+      .panel-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        flex-shrink: 0;
+        padding: 13px 16px;
+      }
+
+      .panel-header {
+        min-height: 56px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .panel-footer {
+        min-height: 48px;
+        border-top: 1px solid var(--line);
+        color: var(--ink-wash);
+        font-size: 12px;
+      }
+
+      .panel-title {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        min-width: 0;
+        font-size: 13px;
+        font-weight: 760;
+      }
+
+      .panel-title span:last-child {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background: var(--source-green);
+        box-shadow: 0 0 0 4px rgba(109, 128, 98, 0.14);
+      }
+
+      .panel-meta {
+        color: var(--ink-wash);
+        font-size: 12px;
+      }
+
+      .toolbar {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+      }
+
+      .editor,
+      .output {
+        flex: 1;
+        width: 100%;
+        min-height: 0;
+        border: 0;
+        outline: 0;
+        resize: none;
+        background: transparent;
+        padding: 18px;
+        color: #353a37;
+        font:
+          14px/1.72 "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      }
+
+      .output {
+        overflow: auto;
+        white-space: pre-wrap;
+      }
+
+      .state-bar {
+        position: fixed;
+        right: 18px;
+        bottom: 18px;
+        z-index: 90;
+        display: grid;
+        gap: 9px;
+        width: 260px;
+        border: 1px solid rgba(31, 37, 34, 0.14);
+        border-radius: 8px;
+        background: rgba(255, 254, 250, 0.92);
+        padding: 12px;
+        box-shadow: 0 16px 40px rgba(31, 37, 34, 0.16);
+        backdrop-filter: blur(18px);
+      }
+
+      .state-bar strong {
+        font-size: 12px;
+      }
+
+      .state-bar pre {
+        overflow: auto;
+        max-height: 110px;
+        margin: 0;
+        color: var(--ink-wash);
+        font: 11px/1.55 "SFMono-Regular", Consolas, monospace;
+      }
+
+      .simulate-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+
+      .simulate-row button {
+        min-height: 32px;
+        border-radius: 7px;
+        background: var(--sumi);
+        color: #fffefa;
+        font-size: 12px;
+        font-weight: 690;
+      }
+
+      .simulate-row button + button {
+        border: 1px solid var(--line);
+        background: transparent;
+        color: var(--sumi);
+      }
+
+      .drag-layer {
+        position: fixed;
+        inset: 0;
+        z-index: 60;
+        display: none;
+        pointer-events: none;
+      }
+
+      body.is-dragging .drag-layer {
+        display: block;
+      }
+
+      .scrim {
+        position: absolute;
+        inset: 0;
+        background: rgba(31, 37, 34, 0.62);
+        backdrop-filter: blur(5px);
+      }
+
+      .variant {
+        position: absolute;
+        inset: 0;
+        display: none;
+      }
+
+      body[data-variant="A"].is-dragging .variant-a,
+      body[data-variant="B"].is-dragging .variant-b,
+      body[data-variant="C"].is-dragging .variant-c {
+        display: block;
+      }
+
+      .file-sheet {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        display: grid;
+        width: min(420px, calc(100vw - 52px));
+        min-height: 270px;
+        transform: translate(-50%, -50%) rotate(0deg);
+        border: 1px solid rgba(255, 254, 250, 0.75);
+        border-radius: 8px;
+        background:
+          linear-gradient(90deg, rgba(40, 95, 115, 0.11), transparent 46%) 0 0 / 100% 100%,
+          #fffefa;
+        padding: 28px;
+        color: var(--sumi);
+        box-shadow: var(--shadow);
+        overflow: hidden;
+        place-items: center;
+        text-align: center;
+        transform-origin: 50% 52%;
+      }
+
+      .file-sheet::before {
+        position: absolute;
+        inset: 15px;
+        border: 1px dashed rgba(40, 95, 115, 0.45);
+        border-radius: 6px;
+        content: "";
+      }
+
+      .file-sheet::after {
+        position: absolute;
+        inset: 0;
+        background: rgba(255, 254, 250, 0.18);
+        content: "";
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .sheet-content {
+        position: relative;
+        z-index: 1;
+        display: grid;
+        justify-items: center;
+        gap: 12px;
+      }
+
+      .drop-icon {
+        display: grid;
+        width: 58px;
+        height: 58px;
+        place-items: center;
+        border-radius: 50%;
+        background: rgba(40, 95, 115, 0.11);
+        color: var(--scanner-blue-deep);
+      }
+
+      .drop-icon svg {
+        width: 30px;
+        height: 30px;
+      }
+
+      .sheet-content strong,
+      .gate-card strong,
+      .dock-main strong {
+        font-size: 20px;
+        line-height: 1.2;
+      }
+
+      .sheet-content p,
+      .gate-card p,
+      .dock-main p {
+        max-width: 310px;
+        margin: 0;
+        color: var(--ink-wash);
+        font-size: 13px;
+        line-height: 1.55;
+      }
+
+      .file-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 34px;
+        border: 1px solid rgba(31, 37, 34, 0.14);
+        border-radius: 999px;
+        background: rgba(247, 245, 236, 0.8);
+        padding: 0 12px;
+        color: var(--scanner-blue-deep);
+        font: 12px/1 "SFMono-Regular", Consolas, monospace;
+      }
+
+      .gate-frame {
+        position: absolute;
+        inset: 22px;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 18px;
+      }
+
+      .gate-panel {
+        border: 1px solid rgba(255, 254, 250, 0.18);
+        border-radius: 8px;
+        background: rgba(255, 254, 250, 0.09);
+      }
+
+      .gate-panel.source {
+        border-color: rgba(255, 254, 250, 0.86);
+        background: rgba(255, 254, 250, 0.18);
+        box-shadow:
+          inset 0 0 0 1px rgba(40, 95, 115, 0.5),
+          0 0 0 6px rgba(40, 95, 115, 0.22);
+      }
+
+      .gate-card {
+        position: absolute;
+        left: 25%;
+        top: 50%;
+        display: grid;
+        width: min(370px, 42vw);
+        transform: translate(-50%, -50%);
+        justify-items: center;
+        gap: 12px;
+        border-radius: 8px;
+        background: #fffefa;
+        padding: 26px;
+        text-align: center;
+        box-shadow: var(--shadow);
+      }
+
+      .gate-card::after {
+        width: 100%;
+        height: 5px;
+        border-radius: 999px;
+        background: linear-gradient(90deg, var(--scanner-blue), var(--source-green));
+        content: "";
+      }
+
+      .panel-label {
+        position: absolute;
+        left: 32px;
+        top: 32px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        border-radius: 999px;
+        background: #fffefa;
+        padding: 7px 12px;
+        color: var(--scanner-blue-deep);
+        font-size: 12px;
+        font-weight: 730;
+        box-shadow: 0 12px 28px rgba(31, 37, 34, 0.16);
+      }
+
+      .drop-dock {
+        position: absolute;
+        inset: auto 22px 22px;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 18px;
+        min-height: 150px;
+        border: 1px solid rgba(255, 254, 250, 0.55);
+        border-radius: 8px;
+        background: rgba(255, 254, 250, 0.95);
+        padding: 22px 26px;
+        box-shadow: var(--shadow);
+      }
+
+      .dock-main {
+        display: grid;
+        grid-template-columns: 58px minmax(0, 1fr);
+        align-items: center;
+        gap: 16px;
+      }
+
+      .dock-copy {
+        display: grid;
+        gap: 6px;
+      }
+
+      .dock-rail {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+      }
+
+      .dock-step {
+        display: grid;
+        min-width: 88px;
+        gap: 4px;
+        border-left: 1px solid rgba(31, 37, 34, 0.14);
+        padding-left: 12px;
+      }
+
+      .dock-step span {
+        color: var(--ink-wash);
+        font-size: 11px;
+      }
+
+      .dock-step b {
+        font-size: 12px;
+      }
+
+      .prototype-switcher {
+        position: fixed;
+        left: 50%;
+        bottom: 18px;
+        z-index: 120;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        transform: translateX(-50%);
+        border: 1px solid rgba(255, 254, 250, 0.18);
+        border-radius: 999px;
+        background: #1f2522;
+        padding: 7px;
+        color: #fffefa;
+        box-shadow: 0 18px 44px rgba(31, 37, 34, 0.25);
+      }
+
+      .prototype-switcher button {
+        display: inline-grid;
+        width: 34px;
+        height: 34px;
+        place-items: center;
+        border-radius: 50%;
+        background: rgba(255, 254, 250, 0.12);
+        color: inherit;
+      }
+
+      .prototype-switcher span {
+        min-width: 205px;
+        padding: 0 6px;
+        text-align: center;
+        font-size: 12px;
+        font-weight: 720;
+      }
+
+      .toast {
+        position: fixed;
+        left: 50%;
+        top: 82px;
+        z-index: 130;
+        display: none;
+        transform: translateX(-50%);
+        border: 1px solid rgba(31, 37, 34, 0.14);
+        border-radius: 999px;
+        background: #fffefa;
+        padding: 9px 14px;
+        color: var(--sumi);
+        font-size: 13px;
+        box-shadow: 0 16px 40px rgba(31, 37, 34, 0.15);
+      }
+
+      .toast.show {
+        display: block;
+      }
+
+      @media (max-width: 760px) {
+        body {
+          min-width: 0;
+        }
+
+        .topbar {
+          grid-template-columns: 1fr;
+          min-height: auto;
+          padding: 12px;
+        }
+
+        .center-controls,
+        .right-controls {
+          justify-content: flex-start;
+          overflow: auto;
+        }
+
+        .workspace {
+          grid-template-columns: 1fr;
+          height: auto;
+          min-height: calc(100vh - 150px);
+          padding: 12px;
+        }
+
+        .panel {
+          min-height: 390px;
+        }
+
+        .gate-frame {
+          grid-template-columns: 1fr;
+        }
+
+        .gate-card {
+          left: 50%;
+          width: min(370px, calc(100vw - 44px));
+        }
+
+        .drop-dock {
+          grid-template-columns: 1fr;
+          inset: auto 12px 80px;
+        }
+
+        .dock-main {
+          grid-template-columns: 1fr;
+          justify-items: center;
+          text-align: center;
+        }
+
+        .dock-rail {
+          overflow: auto;
+          padding-bottom: 2px;
+        }
+
+        .state-bar {
+          display: none;
+        }
+      }
+
+      @media (prefers-reduced-motion: no-preference) {
+        .file-sheet {
+          animation: sheet-focus-in 280ms ease-out both;
+        }
+
+        .file-sheet::before {
+          animation: sheet-border-focus 280ms 50ms ease-out both;
+        }
+
+        .file-sheet::after {
+          animation: sheet-haze-lift 280ms ease-out both;
+        }
+
+        .sheet-content {
+          animation: sheet-content-focus 280ms 50ms ease-out both;
+        }
+
+        .gate-card {
+          animation: gate-enter 180ms ease-out;
+        }
+
+        .drop-dock {
+          animation: dock-enter 180ms ease-out;
+        }
+
+        @keyframes sheet-focus-in {
+          0% {
+            opacity: 0.72;
+            filter: blur(5px) saturate(0.96);
+            transform: translate(-50%, -50%) rotate(0deg);
+          }
+
+          100% {
+            opacity: 1;
+            filter: blur(0) saturate(1);
+            transform: translate(-50%, -50%) rotate(0deg);
+          }
+        }
+
+        @keyframes sheet-border-focus {
+          from {
+            opacity: 0.45;
+            filter: blur(3px);
+          }
+
+          to {
+            opacity: 1;
+            filter: blur(0);
+          }
+        }
+
+        @keyframes sheet-haze-lift {
+          0% {
+            opacity: 0.72;
+          }
+
+          100% {
+            opacity: 0;
+          }
+        }
+
+        @keyframes sheet-content-focus {
+          from {
+            opacity: 0.78;
+            filter: blur(4px);
+          }
+
+          to {
+            opacity: 1;
+            filter: blur(0);
+          }
+        }
+
+        @keyframes gate-enter {
+          from {
+            opacity: 0;
+            transform: translate(-50%, -46%);
+          }
+        }
+
+        @keyframes dock-enter {
+          from {
+            opacity: 0;
+            transform: translateY(12px);
+          }
+        }
+      }
+    </style>
+  </head>
+  <body data-variant="A">
+    <div class="app" id="app">
+      <header class="topbar">
+        <div class="brand">
+          <strong>Kotoba</strong>
+          <span>翻译工作台</span>
+        </div>
+        <div class="center-controls" aria-label="workspace controls">
+          <button class="language-pill" type="button" aria-label="switch translation direction">
+            <span>English</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M7 7h11m0 0-4-4m4 4-4 4M17 17H6m0 0 4 4m-4-4 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            <span>Chinese</span>
+          </button>
+          <button class="primary-button" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m8 5 11 7-11 7V5Z" fill="currentColor" />
+            </svg>
+            Translate
+          </button>
+          <button class="chip" type="button">Faithful</button>
+        </div>
+        <div class="right-controls">
+          <button class="icon-button" type="button" aria-label="history">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5m4-2v6l4 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </button>
+          <button class="icon-button" type="button" aria-label="settings">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm7.4-2.5a7.8 7.8 0 0 0 0-2l2-1.5-2-3.4-2.4 1a8.2 8.2 0 0 0-1.7-1L15 3.5h-4l-.4 2.6c-.6.2-1.2.6-1.7 1l-2.4-1-2 3.4 2 1.5a7.8 7.8 0 0 0 0 2l-2 1.5 2 3.4 2.4-1c.5.4 1.1.8 1.7 1l.4 2.6h4l.4-2.6c.6-.2 1.2-.6 1.7-1l2.4 1 2-3.4-2.1-1.5Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" />
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <main class="workspace" id="drop-root">
+        <section class="panel">
+          <div class="panel-header">
+            <div class="panel-title"><span class="dot"></span><span>Source</span></div>
+            <span class="panel-meta">README.md · 3.8 KB</span>
+          </div>
+          <textarea class="editor" spellcheck="false"># Release notes
+
+Drag a .md or .txt file anywhere over this page.
+
+The production version should keep this source panel as the destination, but make the whole page communicate the drop state before the user releases the file.</textarea>
+          <div class="panel-footer">
+            <span>Markdown input</span>
+            <div class="toolbar">
+              <button class="ghost-button" type="button">Upload</button>
+              <button class="ghost-button" type="button">Copy</button>
+              <button class="ghost-button" type="button">Clear</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <div class="panel-title"><span class="dot"></span><span>Translation</span></div>
+            <span class="panel-meta">Faithful · no model selected</span>
+          </div>
+          <pre class="output">Translation appears here after the source file is loaded.</pre>
+          <div class="panel-footer">
+            <span>Markdown output</span>
+            <div class="toolbar">
+              <button class="ghost-button" type="button">Copy</button>
+              <button class="ghost-button" type="button">Download</button>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div class="drag-layer" aria-live="polite" aria-atomic="true">
+      <div class="scrim"></div>
+
+      <section class="variant variant-a" aria-label="variant A centered sheet">
+        <div class="file-sheet">
+          <div class="sheet-content">
+            <div class="drop-icon">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7l-5-5Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
+                <path d="M14 2v5h5M12 18v-7m0 0-3 3m3-3 3 3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </div>
+            <strong>松手后读取文件</strong>
+            <p>内容会放进 Source 面板，当前输入将被替换。支持 Markdown 和纯文本。</p>
+            <span class="file-chip">sample-brief.md · ready</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="variant variant-b" aria-label="variant B source-target gate">
+        <div class="gate-frame">
+          <div class="gate-panel source"></div>
+          <div class="gate-panel"></div>
+        </div>
+        <span class="panel-label">Drop target · Source</span>
+        <div class="gate-card">
+          <div class="drop-icon">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 3v12m0 0-5-5m5 5 5-5M5 21h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </div>
+          <strong>放到左侧源文档</strong>
+          <p>遮罩保留左右面板结构，只高亮真正会接收文件的区域，减少“到底会放哪”的犹豫。</p>
+          <span class="file-chip">current drop zone: source</span>
+        </div>
+      </section>
+
+      <section class="variant variant-c" aria-label="variant C bottom command dock">
+        <div class="drop-dock">
+          <div class="dock-main">
+            <div class="drop-icon">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </div>
+            <div class="dock-copy">
+              <strong>松手导入并准备翻译</strong>
+              <p>页面变暗，但主要提示停在底部，不挡住用户正在看的文档上下文。</p>
+            </div>
+          </div>
+          <div class="dock-rail">
+            <div class="dock-step"><span>File</span><b>Markdown</b></div>
+            <div class="dock-step"><span>Target</span><b>Source</b></div>
+            <div class="dock-step"><span>Next</span><b>Translate</b></div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="toast" id="toast">Prototype drop captured: file would be loaded into Source.</div>
+
+    <aside class="state-bar" aria-label="prototype state">
+      <strong>Prototype state</strong>
+      <pre id="state"></pre>
+      <div class="simulate-row">
+        <button type="button" id="simulate-drag">Simulate drag</button>
+        <button type="button" id="simulate-drop">Drop / reset</button>
+      </div>
+    </aside>
+
+    <nav class="prototype-switcher" aria-label="prototype variants">
+      <button type="button" id="prev-variant" aria-label="previous variant">‹</button>
+      <span id="variant-label"></span>
+      <button type="button" id="next-variant" aria-label="next variant">›</button>
+    </nav>
+
+    <script>
+      const variants = [
+        { key: "A", name: "centered sheet" },
+        { key: "B", name: "source target" },
+        { key: "C", name: "bottom dock" },
+      ];
+
+      const state = {
+        variant: "A",
+        dragging: false,
+        lastEvent: "idle",
+        acceptedTypes: [".md", ".markdown", ".txt"],
+        dropTarget: "source panel",
+      };
+
+      const stateEl = document.querySelector("#state");
+      const labelEl = document.querySelector("#variant-label");
+      const toastEl = document.querySelector("#toast");
+      const appEl = document.querySelector("#app");
+
+      function getVariantFromUrl() {
+        const param = new URLSearchParams(window.location.search).get("variant");
+        return variants.some((variant) => variant.key === param) ? param : "A";
+      }
+
+      function setVariant(nextVariant, replace = false) {
+        state.variant = nextVariant;
+        document.body.dataset.variant = nextVariant;
+
+        const params = new URLSearchParams(window.location.search);
+        params.set("variant", nextVariant);
+        const nextUrl = `${window.location.pathname}?${params.toString()}${window.location.hash}`;
+        window.history[replace ? "replaceState" : "pushState"]({}, "", nextUrl);
+
+        renderState();
+      }
+
+      function cycleVariant(direction) {
+        const currentIndex = variants.findIndex((variant) => variant.key === state.variant);
+        const nextIndex = (currentIndex + direction + variants.length) % variants.length;
+        setVariant(variants[nextIndex].key);
+      }
+
+      function setDragging(isDragging, lastEvent) {
+        state.dragging = isDragging;
+        state.lastEvent = lastEvent;
+        document.body.classList.toggle("is-dragging", isDragging);
+        appEl.setAttribute("aria-hidden", isDragging ? "true" : "false");
+        renderState();
+      }
+
+      function showToast() {
+        toastEl.classList.add("show");
+        window.setTimeout(() => toastEl.classList.remove("show"), 1600);
+      }
+
+      function renderState() {
+        const variant = variants.find((item) => item.key === state.variant);
+        labelEl.textContent = `${variant.key} — ${variant.name}`;
+        stateEl.textContent = JSON.stringify(state, null, 2);
+      }
+
+      document.querySelector("#prev-variant").addEventListener("click", () => cycleVariant(-1));
+      document.querySelector("#next-variant").addEventListener("click", () => cycleVariant(1));
+      document.querySelector("#simulate-drag").addEventListener("click", () => setDragging(true, "simulated dragover"));
+      document.querySelector("#simulate-drop").addEventListener("click", () => {
+        setDragging(false, "simulated drop");
+        showToast();
+      });
+
+      window.addEventListener("dragenter", (event) => {
+        event.preventDefault();
+        setDragging(true, "dragenter");
+      });
+
+      window.addEventListener("dragover", (event) => {
+        event.preventDefault();
+        state.lastEvent = "dragover";
+        renderState();
+      });
+
+      window.addEventListener("dragleave", (event) => {
+        if (event.clientX <= 0 || event.clientY <= 0 || event.clientX >= window.innerWidth || event.clientY >= window.innerHeight) {
+          setDragging(false, "dragleave window");
+        }
+      });
+
+      window.addEventListener("drop", (event) => {
+        event.preventDefault();
+        setDragging(false, "drop");
+        showToast();
+      });
+
+      window.addEventListener("keydown", (event) => {
+        const target = event.target;
+        const isTextInput = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target.isContentEditable;
+
+        if (isTextInput) {
+          return;
+        }
+
+        if (event.key === "ArrowLeft") {
+          cycleVariant(-1);
+        }
+
+        if (event.key === "ArrowRight") {
+          cycleVariant(1);
+        }
+
+        if (event.key === "Escape") {
+          setDragging(false, "escape");
+        }
+      });
+
+      window.addEventListener("popstate", () => {
+        state.variant = getVariantFromUrl();
+        document.body.dataset.variant = state.variant;
+        renderState();
+      });
+
+      setVariant(getVariantFromUrl(), true);
+    </script>
+  </body>
+</html>

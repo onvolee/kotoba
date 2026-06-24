@@ -86,6 +86,7 @@ const inputTypeOptions = [
 ] as const;
 
 const compactComboboxClassName = "w-36";
+const dragFileTypes = ["Files"];
 
 const translationDirections: Record<TranslationDirection, { sourceKey: string; targetKey: string }> = {
   "en-zh": { sourceKey: "workspace.direction.english", targetKey: "workspace.direction.chinese" },
@@ -99,7 +100,9 @@ type WorkspacePageProps = {
 export function WorkspacePage({ onOpenSettings }: WorkspacePageProps) {
   const { t } = useTranslation();
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [isFileDragActive, setIsFileDragActive] = useState(false);
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
+  const fileDragDepthRef = useRef(0);
   const activeTranslationAbortControllerRef = useRef<AbortController | null>(null);
   const {
     translationDirection,
@@ -222,6 +225,15 @@ export function WorkspacePage({ onOpenSettings }: WorkspacePageProps) {
     activeTranslationAbortControllerRef.current?.abort();
   }
 
+  function resetFileDragState() {
+    fileDragDepthRef.current = 0;
+    setIsFileDragActive(false);
+  }
+
+  function shouldHandleFileDrag(dataTransfer: DataTransfer): boolean {
+    return Array.from(dataTransfer.types).some((type) => dragFileTypes.includes(type));
+  }
+
   async function handleUploadSourceFile(file: File | undefined) {
     if (!file || isTranslating) {
       return;
@@ -258,7 +270,46 @@ export function WorkspacePage({ onOpenSettings }: WorkspacePageProps) {
   }
 
   return (
-    <main className="flex h-screen flex-col overflow-hidden bg-background text-foreground">
+    <main
+      className="relative flex h-screen flex-col overflow-hidden bg-background text-foreground"
+      onDragEnter={(event) => {
+        if (isTranslating || !shouldHandleFileDrag(event.dataTransfer)) {
+          return;
+        }
+
+        event.preventDefault();
+        fileDragDepthRef.current += 1;
+        setIsFileDragActive(true);
+      }}
+      onDragOver={(event) => {
+        if (isTranslating || !shouldHandleFileDrag(event.dataTransfer)) {
+          return;
+        }
+
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "copy";
+      }}
+      onDragLeave={(event) => {
+        if (isTranslating || !isFileDragActive) {
+          return;
+        }
+
+        fileDragDepthRef.current = Math.max(0, fileDragDepthRef.current - 1);
+
+        if (fileDragDepthRef.current === 0) {
+          setIsFileDragActive(false);
+        }
+      }}
+      onDrop={(event) => {
+        if (isTranslating || !shouldHandleFileDrag(event.dataTransfer)) {
+          return;
+        }
+
+        event.preventDefault();
+        resetFileDragState();
+        void handleUploadSourceFile(event.dataTransfer.files[0]);
+      }}
+    >
       <a
         href="#workspace-content"
         className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:rounded-full focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-primary-foreground focus:ring-3 focus:ring-ring/50"
@@ -343,7 +394,6 @@ export function WorkspacePage({ onOpenSettings }: WorkspacePageProps) {
           title={t("workspace.panels.source.title")}
           description={t("workspace.panels.source.description")}
           meta="README.md · 3.8 KB"
-          onFileDrop={(file) => void handleUploadSourceFile(file)}
           headerControl={
             <ContentDisplayModeControl
               ariaLabel={t("workspace.panels.source.formatLabel")}
@@ -480,6 +530,7 @@ export function WorkspacePage({ onOpenSettings }: WorkspacePageProps) {
         </WorkspacePanel>
 
       </section>
+      {isFileDragActive ? <WorkspaceFileDropOverlay /> : null}
     </main>
   );
 }
@@ -500,7 +551,6 @@ type WorkspacePanelProps = {
   footerStatus: string;
   actions: React.ReactNode;
   children: React.ReactNode;
-  onFileDrop?: (file: File | undefined) => void;
 };
 
 type WorkspaceComboboxProps = {
@@ -854,6 +904,35 @@ function ThinkingStatusPanel({ content }: { content: string }) {
   );
 }
 
+function WorkspaceFileDropOverlay() {
+  const { t } = useTranslation();
+
+  return (
+    <div
+      aria-live="polite"
+      aria-atomic="true"
+      className="pointer-events-none fixed inset-0 z-[60] flex items-center justify-center bg-foreground/55 p-6 backdrop-blur-[5px]"
+    >
+      <div className="animate-file-drop-sheet relative grid min-h-[17rem] w-[min(26.25rem,calc(100vw-3.25rem))] place-items-center overflow-hidden rounded-lg border border-card/75 bg-card px-7 py-8 text-center text-card-foreground shadow-[0_24px_70px_rgb(17_24_39/0.20)]">
+        <div className="animate-file-drop-haze absolute inset-0 bg-card/20" />
+        <div className="animate-file-drop-border absolute inset-4 rounded-md border border-dashed border-ring/45" />
+        <div className="animate-file-drop-content relative z-10 grid justify-items-center gap-3">
+          <div className="grid size-14 place-items-center rounded-full bg-accent text-accent-foreground">
+            <Upload aria-hidden="true" className="size-7" />
+          </div>
+          <strong className="text-xl leading-tight">{t("workspace.fileDrop.title")}</strong>
+          <p className="max-w-80 text-sm leading-6 text-muted-foreground">
+            {t("workspace.fileDrop.description")}
+          </p>
+          <span className="inline-flex min-h-8 items-center rounded-full border border-border/80 bg-background/80 px-3 font-mono text-xs text-accent-foreground">
+            {t("workspace.fileDrop.meta")}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function ContentViewer({ ariaLabel, content, contentFormat, editable = false, onContentChange, placeholder, viewFormat }: ContentViewerProps) {
   const shouldRenderPlainText = viewFormat === "Plain text";
   void contentFormat;
@@ -873,9 +952,9 @@ export function ContentViewer({ ariaLabel, content, contentFormat, editable = fa
     return (
       <article
         aria-label={ariaLabel}
-        className="min-h-0 flex-1 overflow-hidden rounded-lg border bg-card shadow-[inset_0_1px_0_rgb(255_255_255/0.60)]"
+        className="min-h-0 flex-1 overflow-hidden rounded-lg border bg-card p-1 shadow-[inset_0_1px_0_rgb(255_255_255/0.60)]"
       >
-        <div className="size-full overflow-auto p-4 pr-6 font-mono text-sm leading-6">
+        <div className="size-full overflow-auto rounded-md p-3 pr-5 font-mono text-sm leading-6 [scrollbar-gutter:stable]">
           {content.trim().length > 0 ? (
             <pre className="whitespace-pre-wrap">{content}</pre>
           ) : (
@@ -902,13 +981,15 @@ function SourceEditor({ ariaLabel, content, onContentChange, placeholder }: Sour
       <label className="sr-only" htmlFor="source-editor">
         {ariaLabel}
       </label>
-      <textarea
-        id="source-editor"
-        className="min-h-0 flex-1 resize-none rounded-lg border bg-card p-4 pr-6 font-mono text-sm leading-6 outline-none shadow-[inset_0_1px_0_rgb(255_255_255/0.60)] focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
-        value={content}
-        placeholder={placeholder}
-        onChange={(event) => onContentChange?.(event.target.value)}
-      />
+      <div className="min-h-0 flex-1 overflow-hidden rounded-lg border bg-card p-1 shadow-[inset_0_1px_0_rgb(255_255_255/0.60)] focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/30">
+        <textarea
+          id="source-editor"
+          className="size-full resize-none overflow-auto rounded-md bg-transparent p-3 pr-5 font-mono text-sm leading-6 outline-none [scrollbar-gutter:stable]"
+          value={content}
+          placeholder={placeholder}
+          onChange={(event) => onContentChange?.(event.target.value)}
+        />
+      </div>
     </>
   );
 }
@@ -942,9 +1023,9 @@ function MarkdownArticle({ ariaLabel, content, placeholder }: MarkdownArticlePro
     >
       <article
         aria-label={ariaLabel}
-        className="min-h-0 flex-1 overflow-hidden rounded-lg border bg-card shadow-[inset_0_1px_0_rgb(255_255_255/0.60)]"
+        className="min-h-0 flex-1 overflow-hidden rounded-lg border bg-card p-1 shadow-[inset_0_1px_0_rgb(255_255_255/0.60)]"
       >
-        <div className="size-full overflow-auto p-4 pr-6 text-sm leading-6">
+        <div className="size-full overflow-auto rounded-md p-3 pr-5 text-sm leading-6 [scrollbar-gutter:stable]">
           <Streamdown
             mode="static"
             controls={false}
@@ -969,9 +1050,9 @@ function RawTextArticle({ ariaLabel, content, placeholder }: RawTextArticleProps
   return (
     <article
       aria-label={ariaLabel}
-      className="min-h-0 flex-1 overflow-hidden rounded-lg border bg-card shadow-[inset_0_1px_0_rgb(255_255_255/0.60)]"
+      className="min-h-0 flex-1 overflow-hidden rounded-lg border bg-card p-1 shadow-[inset_0_1px_0_rgb(255_255_255/0.60)]"
     >
-      <div className="size-full overflow-auto p-4 pr-6 font-mono text-sm leading-6">
+      <div className="size-full overflow-auto rounded-md p-3 pr-5 font-mono text-sm leading-6 [scrollbar-gutter:stable]">
         {content.trim().length > 0 ? (
           <pre className="whitespace-pre-wrap">{content}</pre>
         ) : (
@@ -1015,18 +1096,11 @@ class MarkdownRenderBoundary extends Component<MarkdownRenderBoundaryProps, Mark
   }
 }
 
-function WorkspacePanel({ title, description, meta, headerControl, footerStatus, actions, children, onFileDrop }: WorkspacePanelProps) {
+function WorkspacePanel({ title, description, meta, headerControl, footerStatus, actions, children }: WorkspacePanelProps) {
   return (
     <section
       className="flex min-h-0 flex-col border-b bg-muted/20 md:border-b-0 md:border-r"
       aria-label={title}
-      onDragOver={onFileDrop ? (event) => {
-        event.preventDefault();
-      } : undefined}
-      onDrop={onFileDrop ? (event) => {
-        event.preventDefault();
-        onFileDrop(event.dataTransfer.files[0]);
-      } : undefined}
     >
       <div className="flex shrink-0 flex-col gap-2 border-b bg-card px-4 py-3 sm:flex-row sm:items-center sm:justify-between md:px-6">
         <div className="flex min-w-0 items-center gap-4">

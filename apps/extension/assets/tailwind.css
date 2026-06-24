@@ -123,3 +123,76 @@
     touch-action: manipulation;
   }
 }
+
+@layer utilities {
+  @keyframes file-drop-sheet-focus {
+    from {
+      opacity: 0.72;
+      filter: blur(5px) saturate(0.96);
+    }
+
+    to {
+      opacity: 1;
+      filter: blur(0) saturate(1);
+    }
+  }
+
+  @keyframes file-drop-border-focus {
+    from {
+      opacity: 0.45;
+      filter: blur(3px);
+    }
+
+    to {
+      opacity: 1;
+      filter: blur(0);
+    }
+  }
+
+  @keyframes file-drop-haze-lift {
+    from {
+      opacity: 0.72;
+    }
+
+    to {
+      opacity: 0;
+    }
+  }
+
+  @keyframes file-drop-content-focus {
+    from {
+      opacity: 0.78;
+      filter: blur(4px);
+    }
+
+    to {
+      opacity: 1;
+      filter: blur(0);
+    }
+  }
+
+  .animate-file-drop-sheet {
+    animation: file-drop-sheet-focus 280ms ease-out both;
+  }
+
+  .animate-file-drop-border {
+    animation: file-drop-border-focus 280ms 50ms ease-out both;
+  }
+
+  .animate-file-drop-haze {
+    animation: file-drop-haze-lift 280ms ease-out both;
+  }
+
+  .animate-file-drop-content {
+    animation: file-drop-content-focus 280ms 50ms ease-out both;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-file-drop-sheet,
+    .animate-file-drop-border,
+    .animate-file-drop-haze,
+    .animate-file-drop-content {
+      animation: none;
+    }
+  }
+}
