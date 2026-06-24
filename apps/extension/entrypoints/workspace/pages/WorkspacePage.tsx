@@ -1,4 +1,4 @@
-import { Component, useRef, useState } from "react";
+import { Component, useLayoutEffect, useRef, useState } from "react";
 import {
   ArrowRightLeft,
   Clipboard,
@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { Streamdown } from "streamdown";
 import { useTranslation } from "react-i18next";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import { ScrollArea as BaseScrollArea } from "@base-ui/react/scroll-area";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -896,8 +897,12 @@ function ThinkingStatusPanel({ content }: { content: string }) {
           <LoaderCircle aria-hidden="true" className="size-4 animate-spin text-muted-foreground" />
           <span>{t("workspace.panels.translation.thinkingTitle")}</span>
         </div>
-        <div className="max-h-40 overflow-auto rounded-md border border-border/60 bg-background/65 px-3 py-2 font-mono text-xs leading-5 text-muted-foreground">
-          <pre className="whitespace-pre-wrap">{content}</pre>
+        <div className="h-40 overflow-hidden rounded-md border border-border/60 bg-background/65 p-1">
+          <WorkspaceScrollArea>
+            <div className="px-2 py-1 font-mono text-xs leading-5 text-muted-foreground">
+              <pre className="whitespace-pre-wrap">{content}</pre>
+            </div>
+          </WorkspaceScrollArea>
         </div>
       </div>
     </aside>
@@ -954,13 +959,15 @@ export function ContentViewer({ ariaLabel, content, contentFormat, editable = fa
         aria-label={ariaLabel}
         className="min-h-0 flex-1 overflow-hidden rounded-lg border bg-card p-1 shadow-[inset_0_1px_0_rgb(255_255_255/0.60)]"
       >
-        <div className="size-full overflow-auto rounded-md p-3 pr-5 font-mono text-sm leading-6 [scrollbar-gutter:stable]">
-          {content.trim().length > 0 ? (
-            <pre className="whitespace-pre-wrap">{content}</pre>
-          ) : (
-            <EmptyContentPlaceholder>{placeholder}</EmptyContentPlaceholder>
-          )}
-        </div>
+        <WorkspaceScrollArea>
+          <div className="p-3 pr-5 font-mono text-sm leading-6">
+            {content.trim().length > 0 ? (
+              <pre className="whitespace-pre-wrap">{content}</pre>
+            ) : (
+              <EmptyContentPlaceholder>{placeholder}</EmptyContentPlaceholder>
+            )}
+          </div>
+        </WorkspaceScrollArea>
       </article>
     );
   }
@@ -976,19 +983,35 @@ type SourceEditorProps = {
 };
 
 function SourceEditor({ ariaLabel, content, onContentChange, placeholder }: SourceEditorProps) {
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  useLayoutEffect(() => {
+    const textarea = textareaRef.current;
+
+    if (!textarea) {
+      return;
+    }
+
+    textarea.style.height = "auto";
+    textarea.style.height = `${textarea.scrollHeight}px`;
+  }, [content]);
+
   return (
     <>
       <label className="sr-only" htmlFor="source-editor">
         {ariaLabel}
       </label>
       <div className="min-h-0 flex-1 overflow-hidden rounded-lg border bg-card p-1 shadow-[inset_0_1px_0_rgb(255_255_255/0.60)] focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/30">
-        <textarea
-          id="source-editor"
-          className="size-full resize-none overflow-auto rounded-md bg-transparent p-3 pr-5 font-mono text-sm leading-6 outline-none [scrollbar-gutter:stable]"
-          value={content}
-          placeholder={placeholder}
-          onChange={(event) => onContentChange?.(event.target.value)}
-        />
+        <WorkspaceScrollArea contentClassName="min-h-full">
+          <textarea
+            ref={textareaRef}
+            id="source-editor"
+            className="block min-h-full w-full resize-none overflow-hidden bg-transparent p-3 pr-5 font-mono text-sm leading-6 outline-none"
+            value={content}
+            placeholder={placeholder}
+            onChange={(event) => onContentChange?.(event.target.value)}
+          />
+        </WorkspaceScrollArea>
       </div>
     </>
   );
@@ -1025,16 +1048,18 @@ function MarkdownArticle({ ariaLabel, content, placeholder }: MarkdownArticlePro
         aria-label={ariaLabel}
         className="min-h-0 flex-1 overflow-hidden rounded-lg border bg-card p-1 shadow-[inset_0_1px_0_rgb(255_255_255/0.60)]"
       >
-        <div className="size-full overflow-auto rounded-md p-3 pr-5 text-sm leading-6 [scrollbar-gutter:stable]">
-          <Streamdown
-            mode="static"
-            controls={false}
-            skipHtml
-            className="space-y-4 [&_code]:rounded [&_code]:bg-accent [&_code]:px-1 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-accent-foreground [&_h1]:text-base [&_h1]:font-semibold [&_li]:ml-5 [&_li]:list-disc"
-          >
-            {content}
-          </Streamdown>
-        </div>
+        <WorkspaceScrollArea>
+          <div className="p-3 pr-5 text-sm leading-6">
+            <Streamdown
+              mode="static"
+              controls={false}
+              skipHtml
+              className="space-y-4 [&_code]:rounded [&_code]:bg-accent [&_code]:px-1 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-accent-foreground [&_h1]:text-base [&_h1]:font-semibold [&_li]:ml-5 [&_li]:list-disc"
+            >
+              {content}
+            </Streamdown>
+          </div>
+        </WorkspaceScrollArea>
       </article>
     </MarkdownRenderBoundary>
   );
@@ -1052,14 +1077,41 @@ function RawTextArticle({ ariaLabel, content, placeholder }: RawTextArticleProps
       aria-label={ariaLabel}
       className="min-h-0 flex-1 overflow-hidden rounded-lg border bg-card p-1 shadow-[inset_0_1px_0_rgb(255_255_255/0.60)]"
     >
-      <div className="size-full overflow-auto rounded-md p-3 pr-5 font-mono text-sm leading-6 [scrollbar-gutter:stable]">
-        {content.trim().length > 0 ? (
-          <pre className="whitespace-pre-wrap">{content}</pre>
-        ) : (
-          <EmptyContentPlaceholder>{placeholder}</EmptyContentPlaceholder>
-        )}
-      </div>
+      <WorkspaceScrollArea>
+        <div className="p-3 pr-5 font-mono text-sm leading-6">
+          {content.trim().length > 0 ? (
+            <pre className="whitespace-pre-wrap">{content}</pre>
+          ) : (
+            <EmptyContentPlaceholder>{placeholder}</EmptyContentPlaceholder>
+          )}
+        </div>
+      </WorkspaceScrollArea>
     </article>
+  );
+}
+
+function WorkspaceScrollArea({
+  children,
+  contentClassName,
+}: {
+  children: React.ReactNode;
+  contentClassName?: string;
+}) {
+  return (
+    <BaseScrollArea.Root className="relative size-full rounded-md">
+      <BaseScrollArea.Viewport className="size-full rounded-[inherit] outline-none">
+        <BaseScrollArea.Content className={cn("min-w-fit", contentClassName)}>
+          {children}
+        </BaseScrollArea.Content>
+      </BaseScrollArea.Viewport>
+      <BaseScrollArea.Scrollbar
+        keepMounted
+        className="flex w-4 touch-none justify-center p-1 opacity-0 transition-opacity select-none data-[has-overflow-y]:opacity-100"
+      >
+        <BaseScrollArea.Thumb className="w-2 rounded-full bg-muted-foreground/45" />
+      </BaseScrollArea.Scrollbar>
+      <BaseScrollArea.Corner />
+    </BaseScrollArea.Root>
   );
 }
 
