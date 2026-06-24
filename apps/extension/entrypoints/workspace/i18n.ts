@@ -57,10 +57,12 @@ const resources = {
         panels: {
           source: {
             contentLabel: "Source content",
+            copiedToast: "Source copied",
             description: "Drag a .md or .txt file onto the editor, upload from the bottom bar, or paste directly.",
             formatLabel: "Source display mode",
             footerStatus: "Input: {{format}}",
             title: "Source",
+            uploadedToast: "Source file loaded",
           },
           translation: {
             copiedToast: "Translation copied",
@@ -69,6 +71,7 @@ const resources = {
             footerStatus: "Successful translations will be saved locally",
             meta: "Ready · {{style}} · {{model}}",
             noModel: "No model configured",
+            thinkingTitle: "AI is thinking",
             title: "Translation",
           },
         },
@@ -109,6 +112,8 @@ const resources = {
           showApiKey: "Show API key",
           status: "Connection not tested",
           testConnection: "Test connection",
+          thinkingModeDescription: "Allow reasoning models to spend extra time thinking before they translate. Thinking text appears only while a translation is running.",
+          thinkingModeLabel: "Thinking mode",
           title: "AI settings",
         },
         backToWorkspace: "Back to workspace",
@@ -201,10 +206,12 @@ const resources = {
         panels: {
           source: {
             contentLabel: "原文内容",
+            copiedToast: "原文已复制",
             description: "将 .md 或 .txt 文件拖到编辑器，或从底部上传，也可以直接粘贴。",
             formatLabel: "原文显示模式",
             footerStatus: "输入：{{format}}",
             title: "原文",
+            uploadedToast: "已载入原文文件",
           },
           translation: {
             copiedToast: "译文已复制",
@@ -213,6 +220,7 @@ const resources = {
             footerStatus: "成功翻译会保存在本地",
             meta: "就绪 · {{style}} · {{model}}",
             noModel: "未配置模型",
+            thinkingTitle: "AI 正在思考",
             title: "译文",
           },
         },
@@ -253,6 +261,8 @@ const resources = {
           showApiKey: "显示 API key",
           status: "连接未测试",
           testConnection: "测试连接",
+          thinkingModeDescription: "允许推理模型在翻译前花额外时间思考。思考内容只会在翻译进行中显示。",
+          thinkingModeLabel: "Thinking 模式",
           title: "AI 设置",
         },
         backToWorkspace: "返回工作区",

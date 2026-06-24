@@ -99,10 +99,13 @@ type WorkspacePageProps = {
 export function WorkspacePage({ onOpenSettings }: WorkspacePageProps) {
   const { t } = useTranslation();
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const uploadInputRef = useRef<HTMLInputElement | null>(null);
+  const activeTranslationAbortControllerRef = useRef<AbortController | null>(null);
   const {
     translationDirection,
     sourceContent,
     translationContent,
+    translationThinkingContent,
     sourceViewFormat,
     translationViewFormat,
     historyRecords,
@@ -110,9 +113,12 @@ export function WorkspacePage({ onOpenSettings }: WorkspacePageProps) {
     setTranslationDirection,
     setSourceContent,
     setTranslationContent,
+    setTranslationThinkingContent,
     setSourceViewFormat,
     setTranslationViewFormat,
     setTranslationStatus,
+    clearSourceContent,
+    clearTranslationContent,
     prependHistoryRecord,
     deleteHistoryRecord,
     restoreHistoryRecord,
@@ -125,8 +131,19 @@ export function WorkspacePage({ onOpenSettings }: WorkspacePageProps) {
   const translationContentFormat: ContentFormat = "Markdown";
   const sourceContentFormatLabel = t("common.formats.markdown");
   const stylePreset: TranslationStylePreset = "Faithful";
+  const isTranslating = translationStatus === "streaming";
+  const hasSourceContent = sourceContent.trim().length > 0;
+  const hasTranslationContent = translationContent.trim().length > 0;
+  const canTranslate = hasSourceContent && !isTranslating;
+  const canUseSourceActions = !isTranslating;
+  const canUseTranslationActions = hasTranslationContent && !isTranslating;
+  const shouldShowThinkingStatus = isTranslating && translationThinkingContent.trim().length > 0 && !hasTranslationContent;
 
   async function handleTranslate() {
+    if (!hasSourceContent || isTranslating) {
+      return;
+    }
+
     const providerSettings = await getSavedAISettings();
 
     if (!hasCompleteAISettings(providerSettings)) {
@@ -136,21 +153,39 @@ export function WorkspacePage({ onOpenSettings }: WorkspacePageProps) {
       return;
     }
 
+    const abortController = new AbortController();
+    activeTranslationAbortControllerRef.current = abortController;
+
     setTranslationStatus("streaming");
     setTranslationContent("");
+    setTranslationThinkingContent("");
 
     let completedTranslation = "";
+    let completedThinking = "";
 
     try {
-      for await (const chunk of translateSourceContent({
+      for await (const event of translateSourceContent({
         sourceContent,
         sourceContentFormat,
         translationDirection,
         stylePreset,
         settings: providerSettings,
+        abortSignal: abortController.signal,
       })) {
-        completedTranslation += chunk;
-        setTranslationContent(completedTranslation);
+        if (event.type === "thinking") {
+          completedThinking += event.text;
+          setTranslationThinkingContent(completedThinking);
+        }
+
+        if (event.type === "text") {
+          completedTranslation += event.text;
+          setTranslationContent(completedTranslation);
+        }
+      }
+
+      if (abortController.signal.aborted) {
+        setTranslationStatus(completedTranslation.trim().length > 0 ? "stopped" : "idle");
+        return;
       }
 
       const completedRecord: TranslationHistoryRecord = {
@@ -169,9 +204,57 @@ export function WorkspacePage({ onOpenSettings }: WorkspacePageProps) {
 
       await prependHistoryRecord(completedRecord);
       setTranslationStatus("completed");
-    } catch {
+    } catch (error) {
+      if (abortController.signal.aborted || isAbortError(error)) {
+        setTranslationStatus(completedTranslation.trim().length > 0 ? "stopped" : "idle");
+        return;
+      }
+
       setTranslationStatus("failed");
+    } finally {
+      if (activeTranslationAbortControllerRef.current === abortController) {
+        activeTranslationAbortControllerRef.current = null;
+      }
     }
+  }
+
+  function handleStopTranslation() {
+    activeTranslationAbortControllerRef.current?.abort();
+  }
+
+  async function handleUploadSourceFile(file: File | undefined) {
+    if (!file || isTranslating) {
+      return;
+    }
+
+    setSourceContent(await file.text());
+    toast.success(t("workspace.panels.source.uploadedToast"));
+
+    if (uploadInputRef.current) {
+      uploadInputRef.current.value = "";
+    }
+  }
+
+  async function handleCopy(content: string, successMessage: string) {
+    if (!content.trim()) {
+      return;
+    }
+
+    await navigator.clipboard.writeText(content);
+    toast.success(successMessage);
+  }
+
+  function handleDownload(content: string, filename: string) {
+    if (!content.trim()) {
+      return;
+    }
+
+    const objectUrl = URL.createObjectURL(new Blob([content], { type: "text/markdown;charset=utf-8" }));
+    const anchor = document.createElement("a");
+    anchor.href = objectUrl;
+    anchor.download = filename;
+    anchor.click();
+    URL.revokeObjectURL(objectUrl);
   }
 
   return (
@@ -206,7 +289,7 @@ export function WorkspacePage({ onOpenSettings }: WorkspacePageProps) {
           <Button
             type="button"
             className="ml-0 rounded-full px-4 md:ml-2"
-            disabled={translationStatus === "streaming"}
+            disabled={!canTranslate}
             onClick={handleTranslate}
           >
             <Play data-icon="inline-start" />
@@ -270,19 +353,46 @@ export function WorkspacePage({ onOpenSettings }: WorkspacePageProps) {
           footerStatus={t("workspace.panels.source.footerStatus", { format: sourceContentFormatLabel })}
           actions={
             <>
-              <Button type="button" variant="outline">
+              <input
+                ref={uploadInputRef}
+                type="file"
+                accept=".md,.markdown,.txt,text/markdown,text/plain"
+                className="sr-only"
+                onChange={(event) => void handleUploadSourceFile(event.target.files?.[0])}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!canUseSourceActions}
+                onClick={() => uploadInputRef.current?.click()}
+              >
                 <Upload data-icon="inline-start" />
                 {t("common.actions.upload")}
               </Button>
-              <Button type="button" variant="outline">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!hasSourceContent || !canUseSourceActions}
+                onClick={() => void handleCopy(sourceContent, t("workspace.panels.source.copiedToast"))}
+              >
                 <Clipboard data-icon="inline-start" />
                 {t("common.actions.copy")}
               </Button>
-              <Button type="button" variant="outline">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!hasSourceContent || !canUseSourceActions}
+                onClick={() => handleDownload(sourceContent, "kotoba-source.md")}
+              >
                 <Download data-icon="inline-start" />
                 {t("common.actions.download")}
               </Button>
-              <Button type="button" variant="ghost">
+              <Button
+                type="button"
+                variant="ghost"
+                disabled={!hasSourceContent || !canUseSourceActions}
+                onClick={clearSourceContent}
+              >
                 <Trash2 data-icon="inline-start" />
                 {t("common.actions.clear")}
               </Button>
@@ -315,26 +425,55 @@ export function WorkspacePage({ onOpenSettings }: WorkspacePageProps) {
           footerStatus={t("workspace.panels.translation.footerStatus")}
           actions={
             <>
-              <Button type="button" variant="outline" disabled>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!isTranslating}
+                onClick={handleStopTranslation}
+              >
                 <LoaderCircle data-icon="inline-start" />
                 {t("common.actions.stop")}
               </Button>
-              <Button type="button" variant="outline" onClick={() => toast.success(t("workspace.panels.translation.copiedToast"))}>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!canUseTranslationActions}
+                onClick={() => void handleCopy(translationContent, t("workspace.panels.translation.copiedToast"))}
+              >
                 <Clipboard data-icon="inline-start" />
                 {t("common.actions.copy")}
               </Button>
-              <Button type="button" variant="outline">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!canUseTranslationActions}
+                onClick={() => handleDownload(translationContent, "kotoba-translation.md")}
+              >
                 <Download data-icon="inline-start" />
                 {t("workspace.panels.translation.downloadFilename")}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                disabled={!canUseTranslationActions}
+                onClick={clearTranslationContent}
+              >
+                <Trash2 data-icon="inline-start" />
+                {t("common.actions.clear")}
               </Button>
             </>
           }
         >
-          <ContentViewer
-            content={translationContent}
-            contentFormat={translationContentFormat}
-            viewFormat={translationViewFormat}
-          />
+          <div className="relative flex min-h-0 flex-1">
+            <ContentViewer
+              content={translationContent}
+              contentFormat={translationContentFormat}
+              viewFormat={translationViewFormat}
+            />
+            {shouldShowThinkingStatus ? (
+              <ThinkingStatusPanel content={translationThinkingContent} />
+            ) : null}
+          </div>
         </WorkspacePanel>
 
       </section>
@@ -344,6 +483,10 @@ export function WorkspacePage({ onOpenSettings }: WorkspacePageProps) {
 
 function hasCompleteAISettings(settings: AISettings): boolean {
   return Boolean(settings.baseUrl && settings.apiKey && settings.model);
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "AbortError";
 }
 
 type WorkspacePanelProps = {
@@ -685,6 +828,27 @@ type ContentViewerProps = {
   viewFormat: ContentFormat;
 };
 
+function ThinkingStatusPanel({ content }: { content: string }) {
+  const { t } = useTranslation();
+
+  return (
+    <aside
+      aria-live="polite"
+      className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-card/70 p-6 backdrop-blur-[1px]"
+    >
+      <div className="w-[min(34rem,100%)] rounded-lg border border-border/80 bg-muted/75 p-4 text-sm text-muted-foreground shadow-[0_16px_48px_rgb(15_23_42/0.08),inset_0_1px_0_rgb(255_255_255/0.70)]">
+        <div className="mb-3 flex items-center gap-2 font-medium text-foreground/80">
+          <LoaderCircle aria-hidden="true" className="size-4 animate-spin text-muted-foreground" />
+          <span>{t("workspace.panels.translation.thinkingTitle")}</span>
+        </div>
+        <div className="max-h-40 overflow-auto rounded-md border border-border/60 bg-background/65 px-3 py-2 font-mono text-xs leading-5 text-muted-foreground">
+          <pre className="whitespace-pre-wrap">{content}</pre>
+        </div>
+      </div>
+    </aside>
+  );
+}
+
 export function ContentViewer({ ariaLabel, content, contentFormat, editable = false, onContentChange, viewFormat }: ContentViewerProps) {
   const shouldRenderPlainText = viewFormat === "Plain text";
   void contentFormat;
@@ -703,9 +867,11 @@ export function ContentViewer({ ariaLabel, content, contentFormat, editable = fa
     return (
       <article
         aria-label={ariaLabel}
-        className="min-h-0 flex-1 overflow-auto rounded-lg border bg-card p-4 font-mono text-sm leading-6 shadow-[inset_0_1px_0_rgb(255_255_255/0.60)]"
+        className="min-h-0 flex-1 overflow-hidden rounded-lg border bg-card shadow-[inset_0_1px_0_rgb(255_255_255/0.60)]"
       >
-        <pre className="whitespace-pre-wrap">{content}</pre>
+        <div className="size-full overflow-auto p-4 pr-6 font-mono text-sm leading-6">
+          <pre className="whitespace-pre-wrap">{content}</pre>
+        </div>
       </article>
     );
   }
@@ -727,7 +893,7 @@ function SourceEditor({ ariaLabel, content, onContentChange }: SourceEditorProps
       </label>
       <textarea
         id="source-editor"
-        className="min-h-0 flex-1 resize-none rounded-lg border bg-card p-4 font-mono text-sm leading-6 outline-none shadow-[inset_0_1px_0_rgb(255_255_255/0.60)] focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
+        className="min-h-0 flex-1 resize-none rounded-lg border bg-card p-4 pr-6 font-mono text-sm leading-6 outline-none shadow-[inset_0_1px_0_rgb(255_255_255/0.60)] focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
         value={content}
         onChange={(event) => onContentChange?.(event.target.value)}
       />
@@ -753,16 +919,18 @@ function MarkdownArticle({ ariaLabel, content }: MarkdownArticleProps) {
     >
       <article
         aria-label={ariaLabel}
-        className="min-h-0 flex-1 overflow-auto rounded-lg border bg-card p-4 text-sm leading-6 shadow-[inset_0_1px_0_rgb(255_255_255/0.60)]"
+        className="min-h-0 flex-1 overflow-hidden rounded-lg border bg-card shadow-[inset_0_1px_0_rgb(255_255_255/0.60)]"
       >
-        <Streamdown
-          mode="static"
-          controls={false}
-          skipHtml
-          className="space-y-4 [&_code]:rounded [&_code]:bg-accent [&_code]:px-1 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-accent-foreground [&_h1]:text-base [&_h1]:font-semibold [&_li]:ml-5 [&_li]:list-disc"
-        >
-          {content}
-        </Streamdown>
+        <div className="size-full overflow-auto p-4 pr-6 text-sm leading-6">
+          <Streamdown
+            mode="static"
+            controls={false}
+            skipHtml
+            className="space-y-4 [&_code]:rounded [&_code]:bg-accent [&_code]:px-1 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-accent-foreground [&_h1]:text-base [&_h1]:font-semibold [&_li]:ml-5 [&_li]:list-disc"
+          >
+            {content}
+          </Streamdown>
+        </div>
       </article>
     </MarkdownRenderBoundary>
   );
@@ -777,9 +945,11 @@ function RawTextArticle({ ariaLabel, content }: RawTextArticleProps) {
   return (
     <article
       aria-label={ariaLabel}
-      className="min-h-0 flex-1 overflow-auto rounded-lg border bg-card p-4 font-mono text-sm leading-6 shadow-[inset_0_1px_0_rgb(255_255_255/0.60)]"
+      className="min-h-0 flex-1 overflow-hidden rounded-lg border bg-card shadow-[inset_0_1px_0_rgb(255_255_255/0.60)]"
     >
-      <pre className="whitespace-pre-wrap">{content}</pre>
+      <div className="size-full overflow-auto p-4 pr-6 font-mono text-sm leading-6">
+        <pre className="whitespace-pre-wrap">{content}</pre>
+      </div>
     </article>
   );
 }

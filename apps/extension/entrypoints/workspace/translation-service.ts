@@ -13,7 +13,11 @@ export type TranslateSourceContentOptions = {
   abortSignal?: AbortSignal;
 };
 
-export async function* translateSourceContent(options: TranslateSourceContentOptions): AsyncIterable<string> {
+export type TranslationStreamEvent =
+  | { type: "text"; text: string }
+  | { type: "thinking"; text: string };
+
+export async function* translateSourceContent(options: TranslateSourceContentOptions): AsyncIterable<TranslationStreamEvent> {
   if (!hasCompleteAISettings(options.settings)) {
     throw new Error("Missing AI provider settings");
   }
@@ -26,11 +30,24 @@ export async function* translateSourceContent(options: TranslateSourceContentOpt
     }).chatModel(options.settings.model),
     system: buildTranslationSystemPrompt(options),
     prompt: options.sourceContent,
+    providerOptions: options.settings.thinkingEnabled
+      ? {
+          openaiCompatible: {
+            reasoningEffort: "medium",
+          },
+        }
+      : undefined,
     abortSignal: options.abortSignal,
   });
 
-  for await (const textPart of result.textStream) {
-    yield textPart;
+  for await (const part of result.fullStream) {
+    if (part.type === "reasoning-delta") {
+      yield { type: "thinking", text: part.text };
+    }
+
+    if (part.type === "text-delta") {
+      yield { type: "text", text: part.text };
+    }
   }
 }
 

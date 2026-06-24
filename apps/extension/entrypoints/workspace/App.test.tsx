@@ -37,7 +37,7 @@ describe("workspace shell", () => {
     connectionMocks.testAIConnection.mockResolvedValue({ ok: true });
     translationMocks.translateSourceContent.mockReset();
     translationMocks.translateSourceContent.mockImplementation(async function* () {
-      yield "# 默认译文";
+      yield { type: "text", text: "# 默认译文" };
     });
     useWorkspaceStore.getState().resetWorkspaceStateForTests();
     setBrowserLanguage("en-US");
@@ -65,7 +65,8 @@ describe("workspace shell", () => {
     expect(screen.getByText("输入：Markdown")).toBeInTheDocument();
     expect(screen.getByText("成功翻译会保存在本地")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "上传" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "清空" })).toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: "原文" })).getByRole("button", { name: "清空" })).toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: "译文" })).getByRole("button", { name: "清空" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "停止" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "下载 .zh.md" })).toBeInTheDocument();
   });
@@ -146,6 +147,27 @@ describe("workspace shell", () => {
     expect(screen.getByLabelText("Model")).toHaveValue("example-chat");
   });
 
+  it("saves thinking mode with AI provider settings", async () => {
+    const user = userEvent.setup();
+
+    render(<App />);
+
+    await user.click(await screen.findByRole("button", { name: "Open settings" }));
+    await user.click(screen.getByRole("button", { name: /AI settings/ }));
+
+    await user.type(screen.getByLabelText("Base URL"), "https://api.example.com/v1");
+    await user.type(screen.getByLabelText("API Key"), "sk-real-key");
+    await user.type(screen.getByLabelText("Model"), "example-chat");
+    await user.click(screen.getByRole("switch", { name: "Thinking mode" }));
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+
+    await user.click(screen.getByRole("link", { name: "Back to workspace" }));
+    await user.click(screen.getByRole("button", { name: "Open settings" }));
+    await user.click(screen.getByRole("button", { name: /AI settings/ }));
+
+    expect(await screen.findByRole("switch", { name: "Thinking mode" })).toBeChecked();
+  });
+
   it("toggles API key visibility in AI provider settings", async () => {
     const user = userEvent.setup();
 
@@ -181,11 +203,11 @@ describe("workspace shell", () => {
     await user.click(screen.getByRole("button", { name: "Test connection" }));
 
     await waitFor(() => expect(screen.getByText("Connection passed")).toBeInTheDocument());
-    expect(connectionMocks.testAIConnection).toHaveBeenCalledWith({
+    expect(connectionMocks.testAIConnection).toHaveBeenCalledWith(expect.objectContaining({
       baseUrl: "https://api.example.com/v1",
       apiKey: "sk-real-key",
       model: "example-chat",
-    });
+    }));
 
     firstRender.unmount();
     window.location.hash = "#settings";
@@ -396,8 +418,8 @@ describe("workspace shell", () => {
       model: "example-chat",
     });
     translationMocks.translateSourceContent.mockImplementation(async function* () {
-      yield "# 示例文档\n\n";
-      yield "这是第一段译文。";
+      yield { type: "text", text: "# 示例文档\n\n" };
+      yield { type: "text", text: "这是第一段译文。" };
     });
 
     render(<App />);
@@ -427,6 +449,66 @@ describe("workspace shell", () => {
     expect(historyItem).toHaveTextContent(/B|KB|MB/);
   });
 
+  it("shows thinking output while translating and removes it after translation completes", async () => {
+    const user = userEvent.setup();
+    let releaseTranslation: (() => void) | undefined;
+    await saveAISettings({
+      baseUrl: "https://api.example.com/v1",
+      apiKey: "sk-real-key",
+      model: "example-chat",
+      thinkingEnabled: true,
+    });
+    translationMocks.translateSourceContent.mockImplementation(async function* () {
+      yield { type: "thinking", text: "Checking headings before translating." };
+      await new Promise<void>((resolve) => {
+        releaseTranslation = resolve;
+      });
+      yield { type: "text", text: "# 示例文档" };
+    });
+
+    render(<App />);
+
+    await user.click(await screen.findByRole("button", { name: "Translate" }));
+
+    expect(await screen.findByText("AI is thinking")).toBeInTheDocument();
+    expect(screen.getByText("Checking headings before translating.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Translate" })).toBeDisabled();
+    expect(within(screen.getByRole("region", { name: "Source" })).getByRole("button", { name: "Clear" })).toBeDisabled();
+    expect(within(screen.getByRole("region", { name: "Translation" })).getByRole("button", { name: "Stop" })).toBeEnabled();
+
+    releaseTranslation?.();
+
+    expect(await within(screen.getByRole("region", { name: "Translation" })).findByRole("heading", { name: "示例文档" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText("AI is thinking")).not.toBeInTheDocument());
+  });
+
+  it("keeps stopped partial output out of translation history", async () => {
+    const user = userEvent.setup();
+    await saveAISettings({
+      baseUrl: "https://api.example.com/v1",
+      apiKey: "sk-real-key",
+      model: "example-chat",
+    });
+    translationMocks.translateSourceContent.mockImplementation(async function* ({ abortSignal }: { abortSignal: AbortSignal }) {
+      yield { type: "text", text: "# 部分译文" };
+      await new Promise<void>((resolve) => {
+        abortSignal.addEventListener("abort", () => resolve(), { once: true });
+      });
+    });
+
+    render(<App />);
+
+    await user.click(await screen.findByRole("button", { name: "Translate" }));
+
+    expect(await within(screen.getByRole("region", { name: "Translation" })).findByRole("heading", { name: "部分译文" })).toBeInTheDocument();
+
+    await user.click(within(screen.getByRole("region", { name: "Translation" })).getByRole("button", { name: "Stop" }));
+
+    await waitFor(() => expect(within(screen.getByRole("region", { name: "Translation" })).getByRole("button", { name: "Stop" })).toBeDisabled());
+    await expect(getSavedTranslationHistoryRecords()).resolves.toEqual([]);
+    expect(within(screen.getByRole("region", { name: "Translation" })).getByRole("heading", { name: "部分译文" })).toBeInTheDocument();
+  });
+
   it("persists the completed translation record for future workspace loads", async () => {
     const user = userEvent.setup();
     await saveAISettings({
@@ -435,7 +517,7 @@ describe("workspace shell", () => {
       model: "example-chat",
     });
     translationMocks.translateSourceContent.mockImplementation(async function* () {
-      yield "# 持久化译文";
+      yield { type: "text", text: "# 持久化译文" };
     });
 
     render(<App />);

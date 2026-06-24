@@ -27,12 +27,15 @@ describe("translation service", () => {
 
   it("streams translated text from the configured OpenAI-compatible provider", async () => {
     aiMocks.streamText.mockReturnValue({
-      textStream: toAsyncIterable(["# 标题\n\n", "正文"]),
+      fullStream: toAsyncIterable([
+        { type: "text-delta", text: "# 标题\n\n" },
+        { type: "text-delta", text: "正文" },
+      ]),
     });
 
     const chunks: string[] = [];
 
-    for await (const chunk of translateSourceContent({
+    for await (const event of translateSourceContent({
       sourceContent: "# Title",
       sourceContentFormat: "Markdown",
       translationDirection: "en-zh",
@@ -43,7 +46,7 @@ describe("translation service", () => {
         model: "example-chat",
       },
     })) {
-      chunks.push(chunk);
+      chunks.push(event.text);
     }
 
     expect(chunks).toEqual(["# 标题\n\n", "正文"]);
@@ -55,7 +58,46 @@ describe("translation service", () => {
     expect(aiMocks.chatModel).toHaveBeenCalledWith("example-chat");
     expect(aiMocks.streamText).toHaveBeenCalledWith(expect.objectContaining({
       prompt: "# Title",
+      providerOptions: undefined,
       system: expect.stringContaining("Translate English to Simplified Chinese."),
+    }));
+  });
+
+  it("streams model thinking separately when thinking mode is enabled", async () => {
+    aiMocks.streamText.mockReturnValue({
+      fullStream: toAsyncIterable([
+        { type: "reasoning-delta", text: "Checking the Markdown structure." },
+        { type: "text-delta", text: "# 标题" },
+      ]),
+    });
+
+    const events = [];
+
+    for await (const event of translateSourceContent({
+      sourceContent: "# Title",
+      sourceContentFormat: "Markdown",
+      translationDirection: "en-zh",
+      stylePreset: "Faithful",
+      settings: {
+        baseUrl: "https://api.example.com/v1",
+        apiKey: "sk-test-key",
+        model: "example-chat",
+        thinkingEnabled: true,
+      },
+    })) {
+      events.push(event);
+    }
+
+    expect(events).toEqual([
+      { type: "thinking", text: "Checking the Markdown structure." },
+      { type: "text", text: "# 标题" },
+    ]);
+    expect(aiMocks.streamText).toHaveBeenCalledWith(expect.objectContaining({
+      providerOptions: {
+        openaiCompatible: {
+          reasoningEffort: "medium",
+        },
+      },
     }));
   });
 
@@ -81,7 +123,7 @@ describe("translation service", () => {
   });
 });
 
-async function* toAsyncIterable(chunks: string[]) {
+async function* toAsyncIterable(chunks: Array<{ type: string; text: string }>) {
   for (const chunk of chunks) {
     yield chunk;
   }

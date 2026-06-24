@@ -4,6 +4,7 @@ export type AISettings = {
   baseUrl: string;
   apiKey: string;
   model: string;
+  thinkingEnabled?: boolean;
 };
 
 export type AIConnectionStatus = "not-tested" | "passed" | "failed";
@@ -18,6 +19,7 @@ const emptyAISettings: SavedAISettings = {
   baseUrl: "",
   apiKey: "",
   model: "",
+  thinkingEnabled: false,
   connectionStatus: "not-tested",
 };
 
@@ -57,6 +59,7 @@ function normalizeAISettings(value: Partial<SavedAISettings> | null | undefined)
     baseUrl: normalizeBaseUrl(value?.baseUrl),
     apiKey: typeof value?.apiKey === "string" ? value.apiKey.trim() : "",
     model: typeof value?.model === "string" ? value.model.trim() : "",
+    thinkingEnabled: value?.thinkingEnabled === true,
     connectionStatus: isAIConnectionStatus(value?.connectionStatus) ? value.connectionStatus : "not-tested",
   };
 }

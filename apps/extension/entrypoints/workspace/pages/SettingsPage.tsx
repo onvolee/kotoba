@@ -16,6 +16,7 @@ import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress, ProgressLabel } from "@/components/ui/progress";
+import { Switch } from "@/components/ui/switch";
 import {
   InputGroup,
   InputGroupAddon,
@@ -151,6 +152,7 @@ function AISettingsModule() {
     baseUrl: "",
     apiKey: "",
     model: "",
+    thinkingEnabled: false,
   });
   const [connectionStatus, setConnectionStatus] = useState<AIConnectionStatus | "testing">("not-tested");
   const [isApiKeyVisible, setIsApiKeyVisible] = useState(false);
@@ -245,6 +247,19 @@ function AISettingsModule() {
               autoComplete="off"
             />
           </SettingsField>
+
+          <PreferenceRow
+            label={t("settings.ai.thinkingModeLabel")}
+            description={t("settings.ai.thinkingModeDescription")}
+            compact
+          >
+            <Switch
+              id="thinking-mode"
+              checked={settings.thinkingEnabled}
+              onCheckedChange={(thinkingEnabled) => setSettings((currentSettings) => ({ ...currentSettings, thinkingEnabled }))}
+              aria-label={t("settings.ai.thinkingModeLabel")}
+            />
+          </PreferenceRow>
         </div>
       </section>
 
@@ -272,6 +287,7 @@ function toAISettings(settings: AISettings): AISettings {
     baseUrl: settings.baseUrl,
     apiKey: settings.apiKey,
     model: settings.model,
+    thinkingEnabled: settings.thinkingEnabled,
   };
 }
 
@@ -442,9 +458,12 @@ function MetricCard({ value, label }: { value: string; label: string }) {
   );
 }
 
-function PreferenceRow({ label, description, children }: { label: string; description: string; children: React.ReactNode }) {
+function PreferenceRow({ label, description, children, compact = false }: { label: string; description: string; children: React.ReactNode; compact?: boolean }) {
   return (
-    <div className="grid gap-3 border-b py-4 first:pt-0 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+    <div className={cn(
+      "grid gap-3 border-b py-4 first:pt-0 md:grid-cols-[minmax(0,1fr)_auto] md:items-center",
+      compact ? "rounded-lg border bg-background px-3 py-3 first:pt-3" : null
+    )}>
       <div className="min-w-0">
         <p className="text-sm font-medium">{label}</p>
         <p className="mt-1 text-sm leading-5 text-muted-foreground">{description}</p>

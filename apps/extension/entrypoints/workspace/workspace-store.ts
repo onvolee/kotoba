@@ -7,12 +7,13 @@ import {
   type TranslationHistoryRecord,
 } from "./translation-history";
 
-export type TranslationStatus = "idle" | "streaming" | "completed" | "failed";
+export type TranslationStatus = "idle" | "streaming" | "completed" | "failed" | "stopped";
 
 export type WorkspaceState = {
   translationDirection: TranslationDirection;
   sourceContent: string;
   translationContent: string;
+  translationThinkingContent: string;
   sourceViewFormat: ContentFormat;
   translationViewFormat: ContentFormat;
   historyRecords: TranslationHistoryRecord[];
@@ -20,9 +21,12 @@ export type WorkspaceState = {
   setTranslationDirection: (translationDirection: TranslationDirection) => void;
   setSourceContent: (sourceContent: string) => void;
   setTranslationContent: (translationContent: string) => void;
+  setTranslationThinkingContent: (translationThinkingContent: string) => void;
   setSourceViewFormat: (sourceViewFormat: ContentFormat) => void;
   setTranslationViewFormat: (translationViewFormat: ContentFormat) => void;
   setTranslationStatus: (translationStatus: TranslationStatus) => void;
+  clearSourceContent: () => void;
+  clearTranslationContent: () => void;
   hydrateHistoryRecords: (records: TranslationHistoryRecord[]) => void;
   prependHistoryRecord: (record: TranslationHistoryRecord) => Promise<void>;
   deleteHistoryRecord: (recordId: string) => Promise<void>;
@@ -32,6 +36,7 @@ export type WorkspaceState = {
 
 const initialWorkspaceValues = {
   translationDirection: "en-zh" as const,
+  translationThinkingContent: "",
   sourceViewFormat: "Markdown" as const,
   translationViewFormat: "Markdown" as const,
   historyRecords: [] as TranslationHistoryRecord[],
@@ -58,16 +63,31 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   translationDirection: initialWorkspaceValues.translationDirection,
   sourceContent: sampleSource,
   translationContent: sampleTranslation,
+  translationThinkingContent: initialWorkspaceValues.translationThinkingContent,
   sourceViewFormat: initialWorkspaceValues.sourceViewFormat,
   translationViewFormat: initialWorkspaceValues.translationViewFormat,
   historyRecords: initialWorkspaceValues.historyRecords,
   translationStatus: initialWorkspaceValues.translationStatus,
   setTranslationDirection: (translationDirection) => set({ translationDirection }),
-  setSourceContent: (sourceContent) => set({ sourceContent }),
+  setSourceContent: (sourceContent) => set({ sourceContent, translationStatus: "idle" }),
   setTranslationContent: (translationContent) => set({ translationContent }),
+  setTranslationThinkingContent: (translationThinkingContent) => set({ translationThinkingContent }),
   setSourceViewFormat: (sourceViewFormat) => set({ sourceViewFormat }),
   setTranslationViewFormat: (translationViewFormat) => set({ translationViewFormat }),
-  setTranslationStatus: (translationStatus) => set({ translationStatus }),
+  setTranslationStatus: (translationStatus) => set({
+    translationStatus,
+    ...(translationStatus !== "streaming" ? { translationThinkingContent: "" } : null),
+  }),
+  clearSourceContent: () => set({
+    sourceContent: "",
+    translationStatus: "idle",
+    translationThinkingContent: "",
+  }),
+  clearTranslationContent: () => set({
+    translationContent: "",
+    translationThinkingContent: "",
+    translationStatus: "idle",
+  }),
   hydrateHistoryRecords: (records) => set({ historyRecords: records }),
   prependHistoryRecord: async (record) => {
     let nextRecords: TranslationHistoryRecord[] = [];
@@ -93,6 +113,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
     translationDirection: record.translationDirection,
     sourceContent: record.sourceContent,
     translationContent: record.translatedContent,
+    translationThinkingContent: "",
     sourceViewFormat: record.sourceContentFormat,
     translationViewFormat: record.translationContentFormat,
     translationStatus: "completed",
