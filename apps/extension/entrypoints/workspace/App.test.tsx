@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fakeBrowser } from "wxt/testing";
@@ -346,6 +346,26 @@ describe("workspace shell", () => {
     expect(screen.getByRole("button", { name: "Translate" })).toBeDisabled();
     expect(within(screen.getByRole("region", { name: "Source" })).getByText("Paste Markdown or plain text here, or upload a .md or .txt file.")).toBeInTheDocument();
     expect(within(screen.getByRole("region", { name: "Translation" })).getByText("Translation output will appear here after you start translating.")).toBeInTheDocument();
+  });
+
+  it("renders a Markdown source file dropped onto the source panel", async () => {
+    const file = new File(["# Dropped notes\n\nSource from drag and drop."], "notes.md", {
+      type: "text/markdown",
+    });
+
+    render(<App />);
+
+    const sourcePanel = await screen.findByRole("region", { name: "Source" });
+    fireEvent.drop(sourcePanel, {
+      dataTransfer: {
+        files: [file],
+        items: [{ kind: "file", getAsFile: () => file }],
+        types: ["Files"],
+      },
+    });
+
+    expect(await within(sourcePanel).findByRole("heading", { name: "Dropped notes" })).toBeInTheDocument();
+    expect(within(sourcePanel).getByText("Source from drag and drop.")).toBeInTheDocument();
   });
 
   it("opens local translation history in a right drawer and restores a record", async () => {

@@ -343,6 +343,7 @@ export function WorkspacePage({ onOpenSettings }: WorkspacePageProps) {
           title={t("workspace.panels.source.title")}
           description={t("workspace.panels.source.description")}
           meta="README.md · 3.8 KB"
+          onFileDrop={(file) => void handleUploadSourceFile(file)}
           headerControl={
             <ContentDisplayModeControl
               ariaLabel={t("workspace.panels.source.formatLabel")}
@@ -499,6 +500,7 @@ type WorkspacePanelProps = {
   footerStatus: string;
   actions: React.ReactNode;
   children: React.ReactNode;
+  onFileDrop?: (file: File | undefined) => void;
 };
 
 type WorkspaceComboboxProps = {
@@ -1013,9 +1015,19 @@ class MarkdownRenderBoundary extends Component<MarkdownRenderBoundaryProps, Mark
   }
 }
 
-function WorkspacePanel({ title, description, meta, headerControl, footerStatus, actions, children }: WorkspacePanelProps) {
+function WorkspacePanel({ title, description, meta, headerControl, footerStatus, actions, children, onFileDrop }: WorkspacePanelProps) {
   return (
-    <section className="flex min-h-0 flex-col border-b bg-muted/20 md:border-b-0 md:border-r" aria-label={title}>
+    <section
+      className="flex min-h-0 flex-col border-b bg-muted/20 md:border-b-0 md:border-r"
+      aria-label={title}
+      onDragOver={onFileDrop ? (event) => {
+        event.preventDefault();
+      } : undefined}
+      onDrop={onFileDrop ? (event) => {
+        event.preventDefault();
+        onFileDrop(event.dataTransfer.files[0]);
+      } : undefined}
+    >
       <div className="flex shrink-0 flex-col gap-2 border-b bg-card px-4 py-3 sm:flex-row sm:items-center sm:justify-between md:px-6">
         <div className="flex min-w-0 items-center gap-4">
           <div className="flex shrink-0 items-center gap-2">
