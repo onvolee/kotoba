@@ -176,9 +176,15 @@ export function WorkspacePage({ onOpenSettings }: WorkspacePageProps) {
 
   return (
     <main className="flex h-screen flex-col overflow-hidden bg-background text-foreground">
-      <header className="grid shrink-0 grid-cols-1 gap-3 border-b bg-card px-4 py-3 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:items-center md:px-6" role="banner">
+      <a
+        href="#workspace-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:rounded-full focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-primary-foreground focus:ring-3 focus:ring-ring/50"
+      >
+        Skip to workspace
+      </a>
+      <header className="grid shrink-0 grid-cols-1 gap-3 border-b bg-card px-4 py-3 shadow-[0_1px_2px_rgb(17_24_39/0.03)] md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:items-center md:px-6" role="banner">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-[color-mix(in_srgb,var(--ring),transparent_52%)] bg-accent text-accent-foreground shadow-[0_8px_24px_rgb(0_212_164/0.10)]">
             <Languages aria-hidden="true" />
           </div>
           <div className="min-w-0">
@@ -199,7 +205,7 @@ export function WorkspacePage({ onOpenSettings }: WorkspacePageProps) {
           />
           <Button
             type="button"
-            className="ml-0 md:ml-2"
+            className="ml-0 rounded-full px-4 md:ml-2"
             disabled={translationStatus === "streaming"}
             onClick={handleTranslate}
           >
@@ -249,7 +255,7 @@ export function WorkspacePage({ onOpenSettings }: WorkspacePageProps) {
         </div>
       </header>
 
-      <section className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      <section id="workspace-content" className="grid min-h-0 flex-1 scroll-mt-4 grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <WorkspacePanel
           title={t("workspace.panels.source.title")}
           description={t("workspace.panels.source.description")}
@@ -382,7 +388,7 @@ function TranslationDirectionButton({ source, target, ariaLabel, onSwitch }: Tra
     <Button
       type="button"
       variant="outline"
-      className="h-9 min-w-72 justify-between gap-3 px-3 text-sm"
+      className="h-9 min-w-72 justify-between gap-3 rounded-full px-3 text-sm"
       aria-label={ariaLabel}
       onClick={onSwitch}
     >
@@ -438,7 +444,7 @@ function ContentDisplayModeControl({ ariaLabel, value, onValueChange }: ContentD
   const { t } = useTranslation();
 
   return (
-    <div className="inline-flex max-w-full rounded-lg border bg-muted p-1" role="group" aria-label={ariaLabel}>
+    <div className="inline-flex max-w-full rounded-full border bg-muted p-1" role="group" aria-label={ariaLabel}>
       {inputTypeOptions.map((option) => {
         const isActive = option.value === value;
 
@@ -449,9 +455,9 @@ function ContentDisplayModeControl({ ariaLabel, value, onValueChange }: ContentD
             aria-pressed={isActive}
             onClick={() => onValueChange(option.value)}
             className={cn(
-              "h-7 min-w-20 rounded-md px-3 text-sm font-medium whitespace-nowrap outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50",
+              "h-7 min-w-20 rounded-full px-3 text-sm font-medium whitespace-nowrap outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50",
               isActive
-                ? "bg-background text-foreground shadow-sm"
+                ? "bg-card text-foreground shadow-sm ring-1 ring-border/70"
                 : "text-muted-foreground hover:text-foreground"
             )}
           >
@@ -475,9 +481,9 @@ function TranslationHistoryDrawer({ records, onDeleteRecord, onRestoreRecord }: 
 
   return (
     <>
-      <DrawerHeader className="border-b">
+      <DrawerHeader className="border-b bg-muted/35">
         <div className="flex items-start gap-3">
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-background text-muted-foreground">
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-accent text-accent-foreground ring-1 ring-ring/20">
             <History aria-hidden="true" />
           </div>
           <div className="min-w-0 flex-1">
@@ -525,7 +531,7 @@ function TranslationHistoryDrawer({ records, onDeleteRecord, onRestoreRecord }: 
                   <div
                     key={record.id}
                   >
-                    <Card size="sm" className="group/history mx-0 mb-3 rounded-lg border border-border/70 bg-card py-0 shadow-none transition-colors hover:bg-muted/35">
+                    <Card size="sm" className="group/history mx-0 mb-3 rounded-lg border border-border/70 bg-card py-0 shadow-none transition-colors hover:border-ring/35 hover:bg-accent/25">
                       <div className="flex min-w-0 items-start gap-2 p-3.5">
                         <button
                           type="button"
@@ -538,7 +544,7 @@ function TranslationHistoryDrawer({ records, onDeleteRecord, onRestoreRecord }: 
                             {formatHistoryDate(record.createdAt, i18n.language)} · {record.stylePreset}
                           </CardDescription>
                           <div className="mt-2 flex min-w-0 flex-wrap items-center gap-1.5">
-                            <span className="max-w-full truncate rounded-md border border-border/60 bg-background/70 px-1.5 py-0.5 text-xs text-muted-foreground" translate="no">
+                            <span className="max-w-full truncate rounded-md border border-border/60 bg-muted/70 px-1.5 py-0.5 font-mono text-xs text-muted-foreground" translate="no">
                               {record.model}
                             </span>
                             <span className="rounded-md border border-border/60 bg-background/70 px-1.5 py-0.5 text-xs tabular-nums text-muted-foreground">
@@ -599,7 +605,7 @@ function DeleteHistoryRecordPopover({
         >
           <PopoverHeader>
             <PopoverTitle>{t("workspace.history.deleteConfirmTitle")}</PopoverTitle>
-            <PopoverDescription className="break-words text-xs leading-5">
+            <PopoverDescription className="wrap-break-word text-xs leading-5">
               {t("workspace.history.deleteConfirmDescription", { title: record.title })}
             </PopoverDescription>
           </PopoverHeader>
@@ -635,11 +641,11 @@ function TranslationHistoryEmptyState() {
   const { t } = useTranslation();
 
   return (
-    <Empty className="min-h-[24rem] rounded-lg border bg-muted/20 px-5">
+    <Empty className="min-h-96 rounded-lg border bg-muted/35 px-5">
       <EmptyHeader>
-        <EmptyMedia variant="icon" className="relative size-10 bg-background text-muted-foreground ring-1 ring-border">
+        <EmptyMedia variant="icon" className="relative size-10 bg-card text-muted-foreground ring-1 ring-border">
           <FileText aria-hidden="true" />
-          <span className="absolute -right-1 -bottom-1 flex size-5 items-center justify-center rounded-md bg-primary text-primary-foreground ring-2 ring-background">
+          <span className="absolute -right-1 -bottom-1 flex size-5 items-center justify-center rounded-md bg-accent text-accent-foreground ring-2 ring-background">
             <Languages aria-hidden="true" />
           </span>
         </EmptyMedia>
@@ -697,7 +703,7 @@ export function ContentViewer({ ariaLabel, content, contentFormat, editable = fa
     return (
       <article
         aria-label={ariaLabel}
-        className="min-h-0 flex-1 overflow-auto rounded-lg border bg-background p-4 font-mono text-sm leading-6"
+        className="min-h-0 flex-1 overflow-auto rounded-lg border bg-card p-4 font-mono text-sm leading-6 shadow-[inset_0_1px_0_rgb(255_255_255/0.60)]"
       >
         <pre className="whitespace-pre-wrap">{content}</pre>
       </article>
@@ -721,7 +727,7 @@ function SourceEditor({ ariaLabel, content, onContentChange }: SourceEditorProps
       </label>
       <textarea
         id="source-editor"
-        className="min-h-0 flex-1 resize-none rounded-lg border bg-background p-4 font-mono text-sm leading-6 outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+        className="min-h-0 flex-1 resize-none rounded-lg border bg-card p-4 font-mono text-sm leading-6 outline-none shadow-[inset_0_1px_0_rgb(255_255_255/0.60)] focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
         value={content}
         onChange={(event) => onContentChange?.(event.target.value)}
       />
@@ -747,13 +753,13 @@ function MarkdownArticle({ ariaLabel, content }: MarkdownArticleProps) {
     >
       <article
         aria-label={ariaLabel}
-        className="min-h-0 flex-1 overflow-auto rounded-lg border bg-background p-4 text-sm leading-6"
+        className="min-h-0 flex-1 overflow-auto rounded-lg border bg-card p-4 text-sm leading-6 shadow-[inset_0_1px_0_rgb(255_255_255/0.60)]"
       >
         <Streamdown
           mode="static"
           controls={false}
           skipHtml
-          className="space-y-4 [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:font-mono [&_h1]:text-base [&_h1]:font-semibold [&_li]:ml-5 [&_li]:list-disc"
+          className="space-y-4 [&_code]:rounded [&_code]:bg-accent [&_code]:px-1 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-accent-foreground [&_h1]:text-base [&_h1]:font-semibold [&_li]:ml-5 [&_li]:list-disc"
         >
           {content}
         </Streamdown>
@@ -771,7 +777,7 @@ function RawTextArticle({ ariaLabel, content }: RawTextArticleProps) {
   return (
     <article
       aria-label={ariaLabel}
-      className="min-h-0 flex-1 overflow-auto rounded-lg border bg-background p-4 font-mono text-sm leading-6"
+      className="min-h-0 flex-1 overflow-auto rounded-lg border bg-card p-4 font-mono text-sm leading-6 shadow-[inset_0_1px_0_rgb(255_255_255/0.60)]"
     >
       <pre className="whitespace-pre-wrap">{content}</pre>
     </article>
@@ -805,11 +811,11 @@ class MarkdownRenderBoundary extends Component<MarkdownRenderBoundaryProps, Mark
 
 function WorkspacePanel({ title, description, meta, headerControl, footerStatus, actions, children }: WorkspacePanelProps) {
   return (
-    <section className="flex min-h-0 flex-col border-b md:border-b-0 md:border-r" aria-label={title}>
-      <div className="flex shrink-0 flex-col gap-2 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between md:px-6">
+    <section className="flex min-h-0 flex-col border-b bg-muted/20 md:border-b-0 md:border-r" aria-label={title}>
+      <div className="flex shrink-0 flex-col gap-2 border-b bg-card px-4 py-3 sm:flex-row sm:items-center sm:justify-between md:px-6">
         <div className="flex min-w-0 items-center gap-4">
           <div className="flex shrink-0 items-center gap-2">
-            <FileText aria-hidden="true" className="text-muted-foreground" />
+            <FileText aria-hidden="true" className="text-accent-foreground" />
             <h2 className="text-sm font-semibold">{title}</h2>
           </div>
           {description ? (
@@ -822,7 +828,7 @@ function WorkspacePanel({ title, description, meta, headerControl, footerStatus,
         </div>
       </div>
       <div className="flex min-h-0 flex-1 flex-col gap-3 p-4 md:p-6">{children}</div>
-      <div className="flex shrink-0 flex-col gap-3 border-t px-4 py-3 sm:flex-row sm:items-center sm:justify-between md:px-6">
+      <div className="flex shrink-0 flex-col gap-3 border-t bg-card px-4 py-3 sm:flex-row sm:items-center sm:justify-between md:px-6">
         <p className="text-xs text-muted-foreground">{footerStatus}</p>
         <div className="flex flex-wrap items-center gap-2">{actions}</div>
       </div>

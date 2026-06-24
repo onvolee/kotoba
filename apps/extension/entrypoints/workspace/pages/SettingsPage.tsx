@@ -64,9 +64,15 @@ export function SettingsPage() {
 
   return (
     <main className="flex min-h-screen flex-col bg-background text-foreground">
-      <header className="grid shrink-0 grid-cols-1 gap-3 border-b bg-card px-4 py-3 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:items-center md:px-6" role="banner">
+      <a
+        href="#settings-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:rounded-full focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-primary-foreground focus:ring-3 focus:ring-ring/50"
+      >
+        Skip to settings
+      </a>
+      <header className="grid shrink-0 grid-cols-1 gap-3 border-b bg-card px-4 py-3 shadow-[0_1px_2px_rgb(17_24_39/0.03)] md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:items-center md:px-6" role="banner">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-[color-mix(in_srgb,var(--ring),transparent_52%)] bg-accent text-accent-foreground shadow-[0_8px_24px_rgb(0_212_164/0.10)]">
             <Languages aria-hidden="true" />
           </div>
           <div className="min-w-0">
@@ -84,7 +90,7 @@ export function SettingsPage() {
           <a
             href="#"
             aria-label={t("settings.backToWorkspace")}
-            className="inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-border bg-background px-2.5 text-sm font-medium whitespace-nowrap transition-colors outline-none hover:bg-muted focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+            className="inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-full border border-border bg-background px-3 text-sm font-medium whitespace-nowrap transition-colors outline-none hover:border-ring/40 hover:bg-accent focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
           >
             <ArrowLeft data-icon="inline-start" />
             {t("settings.workspace")}
@@ -92,9 +98,9 @@ export function SettingsPage() {
         </div>
       </header>
 
-      <div className="flex min-h-0 flex-1 justify-center px-4 py-4 md:px-6">
-        <div className="grid min-h-0 w-full max-w-[1200px] grid-cols-1 overflow-hidden rounded-lg border md:grid-cols-[18rem_minmax(0,1fr)]">
-          <aside className="border-b bg-card md:border-b-0 md:border-r" aria-label={t("settings.menu")}>
+      <div className="flex min-h-0 flex-1 justify-center bg-muted/20 px-4 py-4 md:px-6">
+        <div className="grid min-h-0 w-full max-w-[1200px] grid-cols-1 overflow-hidden rounded-lg border bg-card shadow-[0_4px_12px_rgb(17_24_39/0.04)] md:grid-cols-[18rem_minmax(0,1fr)]">
+          <aside className="border-b bg-muted/35 md:border-b-0 md:border-r" aria-label={t("settings.menu")}>
             <div className="flex flex-col gap-3 p-2 md:p-4">
               <nav className="flex flex-col gap-2" aria-label={t("settings.modules.navigation")}>
                 {settingsModules.map((module) => (
@@ -106,16 +112,19 @@ export function SettingsPage() {
                     className={cn(
                       "grid min-h-14 grid-cols-[2rem_minmax(0,1fr)] items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
                       activeModule === module.id
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-transparent hover:border-border hover:bg-muted"
+                        ? "border-ring/35 bg-accent text-accent-foreground shadow-sm"
+                        : "border-transparent hover:border-border hover:bg-card"
                     )}
                   >
-                    <span className="flex size-8 items-center justify-center rounded-lg bg-background/80 text-foreground">
+                    <span className={cn(
+                      "flex size-8 items-center justify-center rounded-lg bg-background/80 text-foreground ring-1 ring-border/60",
+                      activeModule === module.id ? "text-accent-foreground ring-ring/25" : null
+                    )}>
                       {module.icon}
                     </span>
                     <span className="min-w-0">
                       <span className="block truncate font-medium">{t(module.labelKey)}</span>
-                      <span className={cn("block truncate text-xs", activeModule === module.id ? "text-primary-foreground/80" : "text-muted-foreground")}>
+                      <span className={cn("block truncate text-xs", activeModule === module.id ? "text-accent-foreground/80" : "text-muted-foreground")}>
                         {t(module.descriptionKey)}
                       </span>
                     </span>
@@ -125,7 +134,7 @@ export function SettingsPage() {
             </div>
           </aside>
 
-          <section className="min-w-0 overflow-auto p-4 md:p-6" aria-label={t("settings.activeModule")}>
+          <section id="settings-content" className="min-w-0 scroll-mt-4 overflow-auto p-4 md:p-6" aria-label={t("settings.activeModule")}>
             {activeModule === "ai" ? <AISettingsModule /> : null}
             {activeModule === "local-data" ? <LocalDataModule /> : null}
             {activeModule === "performance" ? <PerformanceModule /> : null}
@@ -249,7 +258,7 @@ function AISettingsModule() {
           <Button type="button" variant="outline" onClick={handleTestConnection} disabled={connectionStatus === "testing"}>
             {t("settings.ai.testConnection")}
           </Button>
-          <Button type="button" onClick={handleSaveSettings}>
+          <Button type="button" className="rounded-full px-4" onClick={handleSaveSettings}>
             {t("common.actions.saveChanges")}
           </Button>
         </div>
@@ -352,6 +361,7 @@ function PerformanceModule() {
         <div className="flex justify-end border-t pt-4">
           <Button
             type="button"
+            className="rounded-full px-4"
             onClick={() => {
               void applyUiLanguagePreference(uiLanguagePreference);
               void applyThemePreference(themePreference);
@@ -381,10 +391,10 @@ function ModuleShell({
   children: React.ReactNode;
 }) {
   return (
-    <article className="mx-auto max-w-4xl overflow-hidden rounded-lg border bg-card">
-      <header className="flex flex-col gap-3 border-b p-4 md:flex-row md:items-start md:justify-between md:p-6">
+    <article className="mx-auto max-w-4xl overflow-hidden rounded-lg border bg-card shadow-[0_1px_2px_rgb(17_24_39/0.04)]">
+      <header className="flex flex-col gap-3 border-b bg-muted/20 p-4 md:flex-row md:items-start md:justify-between md:p-6">
         <div className="flex min-w-0 items-start gap-3">
-          <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-accent text-accent-foreground ring-1 ring-ring/20">
             {icon}
           </div>
           <div className="min-w-0">
@@ -396,7 +406,7 @@ function ModuleShell({
           <div
             className={cn(
               "inline-flex shrink-0 items-center gap-2 rounded-lg border bg-background px-2.5 py-1.5 text-sm",
-              statusTone === "success" ? "border-green-200 bg-green-50 text-green-700" : "text-muted-foreground"
+              statusTone === "success" ? "border-ring/30 bg-accent text-accent-foreground" : "text-muted-foreground"
             )}
           >
             <ShieldCheck aria-hidden="true" />
@@ -425,7 +435,7 @@ function SettingsField({ id, label, description, children }: { id: string; label
 
 function MetricCard({ value, label }: { value: string; label: string }) {
   return (
-    <div className="rounded-lg border bg-background p-4">
+    <div className="rounded-lg border bg-background p-4 shadow-[0_1px_2px_rgb(17_24_39/0.03)]">
       <p className="text-2xl font-semibold tracking-normal">{value}</p>
       <p className="text-sm text-muted-foreground">{label}</p>
     </div>
@@ -456,7 +466,7 @@ function CompactSegmentedControl({
   onChange?: (value: string) => void;
 }) {
   return (
-    <div className="inline-flex max-w-full rounded-lg border bg-muted p-1" role="group" aria-label={ariaLabel}>
+    <div className="inline-flex max-w-full rounded-full border bg-muted p-1" role="group" aria-label={ariaLabel}>
       {options.map((option) => (
         <button
           type="button"
@@ -465,9 +475,9 @@ function CompactSegmentedControl({
           aria-pressed={option.value === activeOption}
           onClick={() => onChange?.(option.value)}
           className={cn(
-            "h-7 min-w-20 rounded-md px-3 text-sm font-medium whitespace-nowrap outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50",
+            "h-7 min-w-20 rounded-full px-3 text-sm font-medium whitespace-nowrap outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50",
             option.value === activeOption
-              ? "bg-background text-foreground shadow-sm"
+              ? "bg-card text-foreground shadow-sm ring-1 ring-border/70"
               : "text-muted-foreground hover:text-foreground"
           )}
         >
