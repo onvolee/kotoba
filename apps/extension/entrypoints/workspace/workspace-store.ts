@@ -36,6 +36,8 @@ export type WorkspaceState = {
 
 const initialWorkspaceValues = {
   translationDirection: "en-zh" as const,
+  sourceContent: "",
+  translationContent: "",
   translationThinkingContent: "",
   sourceViewFormat: "Markdown" as const,
   translationViewFormat: "Markdown" as const,
@@ -43,26 +45,10 @@ const initialWorkspaceValues = {
   translationStatus: "idle" as const,
 };
 
-export const sampleSource = `# Release notes
-
-Kotoba keeps Markdown structure intact while translating prose.
-
-- Preserve lists and headings
-- Keep \`pnpm build\`, URLs, and API names unchanged
-- Stream the result into the translation panel`;
-
-export const sampleTranslation = `# 发布说明
-
-Kotoba 会在翻译自然语言时保留 Markdown 结构。
-
-- 保留列表和标题
-- 保持 \`pnpm build\`、URL 和 API 名称不变
-- 将结果流式显示在翻译面板中`;
-
 export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   translationDirection: initialWorkspaceValues.translationDirection,
-  sourceContent: sampleSource,
-  translationContent: sampleTranslation,
+  sourceContent: initialWorkspaceValues.sourceContent,
+  translationContent: initialWorkspaceValues.translationContent,
   translationThinkingContent: initialWorkspaceValues.translationThinkingContent,
   sourceViewFormat: initialWorkspaceValues.sourceViewFormat,
   translationViewFormat: initialWorkspaceValues.translationViewFormat,
@@ -120,7 +106,5 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   }),
   resetWorkspaceStateForTests: () => set({
     ...initialWorkspaceValues,
-    sourceContent: sampleSource,
-    translationContent: sampleTranslation,
   }),
 }));

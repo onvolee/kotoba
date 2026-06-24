@@ -69,6 +69,8 @@ describe("workspace shell", () => {
     expect(within(screen.getByRole("region", { name: "译文" })).getByRole("button", { name: "清空" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "停止" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "下载 .zh.md" })).toBeInTheDocument();
+    expect(screen.getByText("在这里粘贴 Markdown 或纯文本，也可以上传 .md 或 .txt 文件。")).toBeInTheDocument();
+    expect(screen.getByText("开始翻译后，译文会显示在这里。")).toBeInTheDocument();
   });
 
   it("localizes settings modules and preferences into Simplified Chinese", async () => {
@@ -341,6 +343,9 @@ describe("workspace shell", () => {
     expect(getPressedDisplayMode(screen.getByRole("region", { name: "Translation" }), "Translation display mode")).toHaveTextContent("Markdown");
     expect(screen.getByRole("button", { name: "Upload" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Download .zh.md" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Translate" })).toBeDisabled();
+    expect(within(screen.getByRole("region", { name: "Source" })).getByText("Paste Markdown or plain text here, or upload a .md or .txt file.")).toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: "Translation" })).getByText("Translation output will appear here after you start translating.")).toBeInTheDocument();
   });
 
   it("opens local translation history in a right drawer and restores a record", async () => {
@@ -403,8 +408,9 @@ describe("workspace shell", () => {
     const user = userEvent.setup();
 
     render(<App />);
+    await setSourceMarkdown(user, "# Draft translation\n\nSome source text.");
 
-    await user.click(await screen.findByRole("button", { name: "Translate" }));
+    await user.click(screen.getByRole("button", { name: "Translate" }));
 
     expect(translationMocks.translateSourceContent).not.toHaveBeenCalled();
     expect(within(screen.getByRole("region", { name: "Translation" })).queryByRole("heading", { name: "发布说明" })).not.toBeInTheDocument();
@@ -423,14 +429,15 @@ describe("workspace shell", () => {
     });
 
     render(<App />);
+    await setSourceMarkdown(user, "# Release notes");
 
-    await user.click(await screen.findByRole("button", { name: "Translate" }));
+    await user.click(screen.getByRole("button", { name: "Translate" }));
 
     expect(await within(screen.getByRole("region", { name: "Translation" })).findByRole("heading", { name: "示例文档" })).toBeInTheDocument();
     expect(await within(screen.getByRole("region", { name: "Translation" })).findByText("这是第一段译文。")).toBeInTheDocument();
     expect(translationMocks.translateSourceContent).toHaveBeenCalledWith(
       expect.objectContaining({
-        sourceContent: expect.stringContaining("Kotoba keeps Markdown structure"),
+        sourceContent: "# Release notes",
         settings: expect.objectContaining({
           baseUrl: "https://api.example.com/v1",
           apiKey: "sk-real-key",
@@ -467,8 +474,9 @@ describe("workspace shell", () => {
     });
 
     render(<App />);
+    await setSourceMarkdown(user, "# Release notes");
 
-    await user.click(await screen.findByRole("button", { name: "Translate" }));
+    await user.click(screen.getByRole("button", { name: "Translate" }));
 
     expect(await screen.findByText("AI is thinking")).toBeInTheDocument();
     expect(screen.getByText("Checking headings before translating.")).toBeInTheDocument();
@@ -497,8 +505,9 @@ describe("workspace shell", () => {
     });
 
     render(<App />);
+    await setSourceMarkdown(user, "# Release notes");
 
-    await user.click(await screen.findByRole("button", { name: "Translate" }));
+    await user.click(screen.getByRole("button", { name: "Translate" }));
 
     expect(await within(screen.getByRole("region", { name: "Translation" })).findByRole("heading", { name: "部分译文" })).toBeInTheDocument();
 
@@ -521,8 +530,9 @@ describe("workspace shell", () => {
     });
 
     render(<App />);
+    await setSourceMarkdown(user, "# Release notes");
 
-    await user.click(await screen.findByRole("button", { name: "Translate" }));
+    await user.click(screen.getByRole("button", { name: "Translate" }));
 
     await waitFor(async () => {
       await expect(getSavedTranslationHistoryRecords()).resolves.toEqual([
@@ -569,20 +579,16 @@ describe("workspace shell", () => {
     const sourcePanel = await screen.findByRole("region", { name: "Source" });
     const translationPanel = screen.getByRole("region", { name: "Translation" });
 
-    expect(within(sourcePanel).getByRole("heading", { name: "Release notes" })).toBeInTheDocument();
-    expect(within(sourcePanel).getByRole("list")).toHaveTextContent("Preserve lists and headings");
+    expect(within(sourcePanel).getByText("Paste Markdown or plain text here, or upload a .md or .txt file.")).toBeInTheDocument();
     expect(within(sourcePanel).queryByRole("textbox", { name: "Source content" })).not.toBeInTheDocument();
-    expect(within(translationPanel).getByRole("heading", { name: "发布说明" })).toBeInTheDocument();
-    expect(within(translationPanel).getByRole("list")).toHaveTextContent("保留列表和标题");
+    expect(within(translationPanel).getByText("Translation output will appear here after you start translating.")).toBeInTheDocument();
 
     await user.click(getDisplayModeButton(sourcePanel, "Source display mode", "Plain text"));
     await user.click(getDisplayModeButton(translationPanel, "Translation display mode", "Plain text"));
 
     const sourceTextbox = within(sourcePanel).getByRole("textbox", { name: "Source content" });
-    expect((sourceTextbox as HTMLTextAreaElement).value).toContain("# Release notes");
-    expect((sourceTextbox as HTMLTextAreaElement).value).toContain("- Preserve lists and headings");
-    expect(within(translationPanel).getByText(/^# 发布说明/)).toBeInTheDocument();
-    expect(within(translationPanel).getByText(/- 保留列表和标题/)).toBeInTheDocument();
+    expect(sourceTextbox).toHaveAttribute("placeholder", "Paste Markdown or plain text here, or upload a .md or .txt file.");
+    expect(within(translationPanel).getByText("Translation output will appear here after you start translating.")).toBeInTheDocument();
   });
 
   it("edits source content as raw text and previews it as Markdown in a single content area", async () => {
@@ -640,6 +646,14 @@ function getDisplayModeButton(panel: HTMLElement, groupName: string, optionName:
 
 function getPressedDisplayMode(panel: HTMLElement, groupName: string) {
   return within(within(panel).getByRole("group", { name: groupName })).getByRole("button", { pressed: true });
+}
+
+async function setSourceMarkdown(user: ReturnType<typeof userEvent.setup>, content: string) {
+  const sourcePanel = await screen.findByRole("region", { name: "Source" });
+
+  await user.click(getDisplayModeButton(sourcePanel, "Source display mode", "Plain text"));
+  await user.clear(within(sourcePanel).getByRole("textbox", { name: "Source content" }));
+  await user.type(within(sourcePanel).getByRole("textbox", { name: "Source content" }), content);
 }
 
 function createHistoryRecord(overrides: Partial<TranslationHistoryRecord> = {}): TranslationHistoryRecord {

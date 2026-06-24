@@ -405,6 +405,7 @@ export function WorkspacePage({ onOpenSettings }: WorkspacePageProps) {
             contentFormat={sourceContentFormat}
             editable
             onContentChange={setSourceContent}
+            placeholder={t("workspace.panels.source.placeholder")}
             viewFormat={sourceViewFormat}
           />
         </WorkspacePanel>
@@ -468,6 +469,7 @@ export function WorkspacePage({ onOpenSettings }: WorkspacePageProps) {
             <ContentViewer
               content={translationContent}
               contentFormat={translationContentFormat}
+              placeholder={t("workspace.panels.translation.placeholder")}
               viewFormat={translationViewFormat}
             />
             {shouldShowThinkingStatus ? (
@@ -825,6 +827,7 @@ type ContentViewerProps = {
   contentFormat: ContentFormat;
   editable?: boolean;
   onContentChange?: (content: string) => void;
+  placeholder?: string;
   viewFormat: ContentFormat;
 };
 
@@ -849,7 +852,7 @@ function ThinkingStatusPanel({ content }: { content: string }) {
   );
 }
 
-export function ContentViewer({ ariaLabel, content, contentFormat, editable = false, onContentChange, viewFormat }: ContentViewerProps) {
+export function ContentViewer({ ariaLabel, content, contentFormat, editable = false, onContentChange, placeholder, viewFormat }: ContentViewerProps) {
   const shouldRenderPlainText = viewFormat === "Plain text";
   void contentFormat;
 
@@ -860,6 +863,7 @@ export function ContentViewer({ ariaLabel, content, contentFormat, editable = fa
           ariaLabel={ariaLabel}
           content={content}
           onContentChange={onContentChange}
+          placeholder={placeholder}
         />
       );
     }
@@ -870,22 +874,27 @@ export function ContentViewer({ ariaLabel, content, contentFormat, editable = fa
         className="min-h-0 flex-1 overflow-hidden rounded-lg border bg-card shadow-[inset_0_1px_0_rgb(255_255_255/0.60)]"
       >
         <div className="size-full overflow-auto p-4 pr-6 font-mono text-sm leading-6">
-          <pre className="whitespace-pre-wrap">{content}</pre>
+          {content.trim().length > 0 ? (
+            <pre className="whitespace-pre-wrap">{content}</pre>
+          ) : (
+            <EmptyContentPlaceholder>{placeholder}</EmptyContentPlaceholder>
+          )}
         </div>
       </article>
     );
   }
 
-  return <MarkdownArticle ariaLabel={ariaLabel} content={content} />;
+  return <MarkdownArticle ariaLabel={ariaLabel} content={content} placeholder={placeholder} />;
 }
 
 type SourceEditorProps = {
   ariaLabel?: string;
   content: string;
   onContentChange?: (content: string) => void;
+  placeholder?: string;
 };
 
-function SourceEditor({ ariaLabel, content, onContentChange }: SourceEditorProps) {
+function SourceEditor({ ariaLabel, content, onContentChange, placeholder }: SourceEditorProps) {
   return (
     <>
       <label className="sr-only" htmlFor="source-editor">
@@ -895,6 +904,7 @@ function SourceEditor({ ariaLabel, content, onContentChange }: SourceEditorProps
         id="source-editor"
         className="min-h-0 flex-1 resize-none rounded-lg border bg-card p-4 pr-6 font-mono text-sm leading-6 outline-none shadow-[inset_0_1px_0_rgb(255_255_255/0.60)] focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
         value={content}
+        placeholder={placeholder}
         onChange={(event) => onContentChange?.(event.target.value)}
       />
     </>
@@ -904,9 +914,20 @@ function SourceEditor({ ariaLabel, content, onContentChange }: SourceEditorProps
 type MarkdownArticleProps = {
   ariaLabel?: string;
   content: string;
+  placeholder?: string;
 };
 
-function MarkdownArticle({ ariaLabel, content }: MarkdownArticleProps) {
+function MarkdownArticle({ ariaLabel, content, placeholder }: MarkdownArticleProps) {
+  if (content.trim().length === 0) {
+    return (
+      <RawTextArticle
+        ariaLabel={ariaLabel}
+        content=""
+        placeholder={placeholder}
+      />
+    );
+  }
+
   return (
     <MarkdownRenderBoundary
       key={content}
@@ -939,18 +960,31 @@ function MarkdownArticle({ ariaLabel, content }: MarkdownArticleProps) {
 type RawTextArticleProps = {
   ariaLabel?: string;
   content: string;
+  placeholder?: string;
 };
 
-function RawTextArticle({ ariaLabel, content }: RawTextArticleProps) {
+function RawTextArticle({ ariaLabel, content, placeholder }: RawTextArticleProps) {
   return (
     <article
       aria-label={ariaLabel}
       className="min-h-0 flex-1 overflow-hidden rounded-lg border bg-card shadow-[inset_0_1px_0_rgb(255_255_255/0.60)]"
     >
       <div className="size-full overflow-auto p-4 pr-6 font-mono text-sm leading-6">
-        <pre className="whitespace-pre-wrap">{content}</pre>
+        {content.trim().length > 0 ? (
+          <pre className="whitespace-pre-wrap">{content}</pre>
+        ) : (
+          <EmptyContentPlaceholder>{placeholder}</EmptyContentPlaceholder>
+        )}
       </div>
     </article>
+  );
+}
+
+function EmptyContentPlaceholder({ children }: { children?: string }) {
+  return (
+    <p className="max-w-md text-sm leading-6 text-muted-foreground/75">
+      {children}
+    </p>
   );
 }
 
