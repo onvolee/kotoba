@@ -6,12 +6,35 @@ import { WorkspacePage } from "./pages/WorkspacePage";
 import { applySavedThemePreference } from "./theme-preference";
 import { getSavedTranslationHistoryRecords } from "./translation-history";
 import { useWorkspaceStore } from "./workspace-store";
+// import { ScrollArea } from "@/components/ui/scroll-area"
+// import React from "react";
+// import { Separator } from "@/components/ui/separator";
 
 type WorkspaceRoute = "workspace" | "settings";
 
 function App() {
   const [isI18nReady, setIsI18nReady] = useState(false);
   const [route, setRoute] = useState<WorkspaceRoute>(() => getWorkspaceRoute());
+
+  const tags = Array.from({ length: 50 }).map(
+    (_, i, a) => `v1.2.0-beta.${a.length - i}`
+  )
+
+  // return (
+  //   <>
+  //     <ScrollArea className="h-72 w-48 rounded-md border">
+  //       <div className="p-4">
+  //         <h4 className="mb-4 text-sm leading-none font-medium">Tags</h4>
+  //         {tags.map((tag) => (
+  //           <React.Fragment key={tag}>
+  //             <div className="text-sm">{tag}</div>
+  //             <Separator className="my-2" />
+  //           </React.Fragment>
+  //         ))}
+  //       </div>
+  //     </ScrollArea>
+  //   </>
+  // )
 
   useEffect(() => {
     let isMounted = true;

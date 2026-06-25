@@ -12,6 +12,7 @@ const resources = {
     translation: {
       common: {
         actions: {
+          cancel: "Cancel",
           clear: "Clear",
           copy: "Copy",
           download: "Download",
@@ -143,6 +144,7 @@ const resources = {
           localDataDescription: "History storage estimate",
           navigation: "Settings modules",
           performanceDescription: "Language and theme",
+          stylePromptsDescription: "AI tone instructions",
         },
         performance: {
           description: "Configure display preferences for the workspace interface.",
@@ -159,6 +161,36 @@ const resources = {
           uiLanguageLabel: "UI language",
         },
         saveChanges: "Save changes",
+        stylePrompts: {
+          addAction: "Add style prompt",
+          addDescription: "Create a reusable prompt that describes how AI should shape wording and tone.",
+          addSection: "New style prompt",
+          builtInBadge: "Built-in",
+          builtIns: {
+            "built-in-general": {
+              name: "General",
+              prompt: "Use clear, natural wording for general reading. Keep the tone neutral and avoid adding details that are not in the source.",
+            },
+            "built-in-programming-technology": {
+              name: "Programming technology",
+              prompt: "Preserve technical names, commands, code, API names, and file paths. Use precise terminology and keep explanations compact.",
+            },
+          },
+          customBadge: "Custom",
+          deleteAction: "Delete {{name}}",
+          description: "Manage reusable AI style prompts for translation tone and wording.",
+          editAction: "Edit {{name}}",
+          editDrawerDescription: "Use the larger editor to refine longer instructions without crowding the prompt list.",
+          editDrawerTitle: "Edit style prompt",
+          editNameLabel: "Edit style name",
+          editPromptLabel: "Edit prompt",
+          nameDescription: "Use a short name that is easy to recognize in a list.",
+          nameLabel: "Style name",
+          promptDescription: "Write the instruction the AI should follow for this style.",
+          promptLabel: "Prompt",
+          saveAction: "Save style prompt",
+          title: "Style prompts",
+        },
         title: "Settings",
         workspace: "Workspace",
       },
@@ -168,6 +200,7 @@ const resources = {
     translation: {
       common: {
         actions: {
+          cancel: "取消",
           clear: "清空",
           copy: "复制",
           download: "下载",
@@ -299,6 +332,7 @@ const resources = {
           localDataDescription: "历史存储估算",
           navigation: "设置模块",
           performanceDescription: "语言与主题",
+          stylePromptsDescription: "AI 语气指令",
         },
         performance: {
           description: "配置工作区界面的显示偏好。",
@@ -315,6 +349,36 @@ const resources = {
           uiLanguageLabel: "界面语言",
         },
         saveChanges: "保存更改",
+        stylePrompts: {
+          addAction: "添加风格提示词",
+          addDescription: "创建一条可复用提示词，用来描述 AI 应该如何处理措辞和语气。",
+          addSection: "新风格提示词",
+          builtInBadge: "内置",
+          builtIns: {
+            "built-in-general": {
+              name: "通用",
+              prompt: "使用清晰自然、适合普通阅读的表达。保持中性语气，不补充原文没有的信息。",
+            },
+            "built-in-programming-technology": {
+              name: "编程技术",
+              prompt: "保留技术名称、命令、代码、API 名称和文件路径。使用准确术语，并保持说明紧凑。",
+            },
+          },
+          customBadge: "自定义",
+          deleteAction: "删除 {{name}}",
+          description: "管理用于控制翻译语气和措辞的 AI 风格提示词。",
+          editAction: "编辑 {{name}}",
+          editDrawerDescription: "在更大的编辑区里调整较长指令，避免挤占提示词列表。",
+          editDrawerTitle: "编辑风格提示词",
+          editNameLabel: "编辑风格名称",
+          editPromptLabel: "编辑提示词",
+          nameDescription: "使用一个在列表中容易识别的短名称。",
+          nameLabel: "风格名称",
+          promptDescription: "写下 AI 在这个风格下需要遵循的指令。",
+          promptLabel: "提示词",
+          saveAction: "保存风格提示词",
+          title: "风格提示词",
+        },
         title: "设置",
         workspace: "工作区",
       },

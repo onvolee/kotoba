@@ -90,6 +90,87 @@ describe("workspace shell", () => {
     expect(screen.getByRole("group", { name: "主题" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "浅色" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "深色" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /风格提示词/ }));
+    expect(screen.getByRole("article", { name: "编程技术" })).toBeInTheDocument();
+    expect(screen.getByRole("article", { name: "通用" })).toBeInTheDocument();
+  });
+
+  it("lets users manage AI style prompts from settings", async () => {
+    const user = userEvent.setup();
+
+    render(<App />);
+
+    await user.click(await screen.findByRole("button", { name: "Open settings" }));
+    await user.click(screen.getByRole("button", { name: /Style prompts/ }));
+
+    expect(screen.getByRole("heading", { name: "Style prompts", level: 2 })).toBeInTheDocument();
+    expect(screen.getByRole("article", { name: "Programming technology" })).toHaveTextContent("Preserve technical names, commands, code, API names, and file paths");
+    expect(screen.getByRole("article", { name: "General" })).toHaveTextContent("Use clear, natural wording for general reading");
+
+    await user.click(screen.getByRole("button", { name: "Add style prompt" }));
+
+    const promptEditor = await screen.findByRole("dialog", { name: "New style prompt" });
+    await user.type(within(promptEditor).getByLabelText("Style name"), "Release notes");
+    await user.type(within(promptEditor).getByLabelText("Prompt"), "Translate release notes with concise product language.");
+    await user.click(within(promptEditor).getByRole("button", { name: "Add style prompt" }));
+
+    expect(screen.getByRole("article", { name: "Release notes" })).toHaveTextContent("Translate release notes with concise product language.");
+    expect(screen.queryByRole("dialog", { name: "New style prompt" })).not.toBeInTheDocument();
+  });
+
+  it("shows saved custom style prompts when settings is opened again", async () => {
+    const user = userEvent.setup();
+    const firstRender = render(<App />);
+
+    await user.click(await screen.findByRole("button", { name: "Open settings" }));
+    await user.click(screen.getByRole("button", { name: /Style prompts/ }));
+    await user.click(screen.getByRole("button", { name: "Add style prompt" }));
+
+    const promptEditor = await screen.findByRole("dialog", { name: "New style prompt" });
+    await user.type(within(promptEditor).getByLabelText("Style name"), "Support reply");
+    await user.type(within(promptEditor).getByLabelText("Prompt"), "Use concise, friendly support language.");
+    await user.click(within(promptEditor).getByRole("button", { name: "Add style prompt" }));
+
+    firstRender.unmount();
+    window.location.hash = "#settings";
+    resetWorkspaceI18nForTests();
+
+    render(<App />);
+    await user.click(await screen.findByRole("button", { name: /Style prompts/ }));
+
+    expect(await screen.findByRole("article", { name: "Support reply" })).toHaveTextContent("Use concise, friendly support language.");
+  });
+
+  it("lets users edit and delete custom style prompts", async () => {
+    const user = userEvent.setup();
+
+    render(<App />);
+
+    await user.click(await screen.findByRole("button", { name: "Open settings" }));
+    await user.click(screen.getByRole("button", { name: /Style prompts/ }));
+    await user.click(screen.getByRole("button", { name: "Add style prompt" }));
+
+    const createEditor = await screen.findByRole("dialog", { name: "New style prompt" });
+    await user.type(within(createEditor).getByLabelText("Style name"), "Draft voice");
+    await user.type(within(createEditor).getByLabelText("Prompt"), "Use draft wording.");
+    await user.click(within(createEditor).getByRole("button", { name: "Add style prompt" }));
+
+    const customCard = screen.getByRole("article", { name: "Draft voice" });
+    await user.click(within(customCard).getByRole("button", { name: "Edit Draft voice" }));
+
+    const editEditor = await screen.findByRole("dialog", { name: "Edit style prompt" });
+    await user.clear(within(editEditor).getByLabelText("Style name"));
+    await user.type(within(editEditor).getByLabelText("Style name"), "Review voice");
+    await user.clear(within(editEditor).getByLabelText("Prompt"));
+    await user.type(within(editEditor).getByLabelText("Prompt"), "Use precise review language.");
+    await user.click(within(editEditor).getByRole("button", { name: "Save style prompt" }));
+
+    expect(screen.getByRole("article", { name: "Review voice" })).toHaveTextContent("Use precise review language.");
+    expect(screen.queryByRole("article", { name: "Draft voice" })).not.toBeInTheDocument();
+
+    await user.click(within(screen.getByRole("article", { name: "Review voice" })).getByRole("button", { name: "Delete Review voice" }));
+
+    expect(screen.queryByRole("article", { name: "Review voice" })).not.toBeInTheDocument();
   });
 
   it("shows the settings route with display preferences and a workspace return", async () => {

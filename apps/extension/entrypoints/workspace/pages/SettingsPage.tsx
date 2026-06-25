@@ -3,20 +3,35 @@ import {
   ArrowLeft,
   BarChart3,
   Database,
+  Pencil,
   Eye,
   EyeOff,
   KeyRound,
   Languages,
   MonitorCog,
+  Palette,
   PlugZap,
+  Plus,
+  Trash2,
   ShieldCheck,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
+import {
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
 import { Input } from "@/components/ui/input";
 import { Progress, ProgressLabel } from "@/components/ui/progress";
-import { Switch } from "@/components/ui/switch";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Switch, SwitchThumb } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import {
   InputGroup,
   InputGroupAddon,
@@ -27,11 +42,15 @@ import { cn } from "@/lib/utils";
 import { testAIConnection } from "../ai-connection";
 import { getSavedAISettings, saveAIConnectionStatus, saveAISettings, type AIConnectionStatus, type AISettings } from "../ai-settings";
 import { applyUiLanguagePreference, getSavedUiLanguagePreference, type UiLanguagePreference } from "../i18n";
+import { addStylePrompt, deleteStylePrompt, getSavedStylePrompts, updateStylePrompt, type StylePrompt } from "../style-prompts";
 import { applyThemePreference, getSavedThemePreference, type WorkspaceThemePreference } from "../theme-preference";
 import { estimateHistoryStorageUsage, formatStorageBytes } from "../translation-history";
 import { useWorkspaceStore } from "../workspace-store";
 
-type SettingsModule = "ai" | "local-data" | "performance";
+type SettingsModule = "ai" | "local-data" | "performance" | "style-prompts";
+type StylePromptEditorState =
+  | { mode: "create" }
+  | { mode: "edit"; stylePrompt: StylePrompt };
 
 const settingsModules: {
   id: SettingsModule;
@@ -52,6 +71,12 @@ const settingsModules: {
     icon: <PlugZap aria-hidden="true" />,
   },
   {
+    id: "style-prompts",
+    labelKey: "settings.stylePrompts.title",
+    descriptionKey: "settings.modules.stylePromptsDescription",
+    icon: <Palette aria-hidden="true" />,
+  },
+  {
     id: "local-data",
     labelKey: "settings.localData.title",
     descriptionKey: "settings.modules.localDataDescription",
@@ -64,7 +89,7 @@ export function SettingsPage() {
   const [activeModule, setActiveModule] = useState<SettingsModule>("performance");
 
   return (
-    <main className="flex min-h-screen flex-col bg-background text-foreground">
+    <main className="flex h-screen min-h-0 flex-col overflow-hidden bg-background text-foreground">
       <a
         href="#settings-content"
         className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:rounded-full focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-primary-foreground focus:ring-3 focus:ring-ring/50"
@@ -100,7 +125,7 @@ export function SettingsPage() {
       </header>
 
       <div className="flex min-h-0 flex-1 justify-center bg-muted/20 px-4 py-4 md:px-6">
-        <div className="grid min-h-0 w-full max-w-[1200px] grid-cols-1 overflow-hidden rounded-lg border bg-card shadow-[0_4px_12px_rgb(17_24_39/0.04)] md:grid-cols-[18rem_minmax(0,1fr)]">
+        <div className="grid min-h-0 w-full max-w-[1200px] grid-cols-1 grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-lg border bg-card shadow-[0_4px_12px_rgb(17_24_39/0.04)] md:grid-cols-[18rem_minmax(0,1fr)] md:grid-rows-1">
           <aside className="border-b bg-muted/35 md:border-b-0 md:border-r" aria-label={t("settings.menu")}>
             <div className="flex flex-col gap-3 p-2 md:p-4">
               <nav className="flex flex-col gap-2" aria-label={t("settings.modules.navigation")}>
@@ -118,7 +143,7 @@ export function SettingsPage() {
                     )}
                   >
                     <span className={cn(
-                      "flex size-8 items-center justify-center rounded-lg bg-background/80 text-foreground ring-1 ring-border/60",
+                      "flex size-8 items-center justify-center rounded-lg bg-card text-foreground ring-1 ring-border/60",
                       activeModule === module.id ? "text-accent-foreground ring-ring/25" : null
                     )}>
                       {module.icon}
@@ -135,8 +160,9 @@ export function SettingsPage() {
             </div>
           </aside>
 
-          <section id="settings-content" className="min-w-0 scroll-mt-4 overflow-auto p-4 md:p-6" aria-label={t("settings.activeModule")}>
+          <section id="settings-content" className="flex h-full min-h-0 min-w-0 flex-col scroll-mt-4 p-4 md:p-6" aria-label={t("settings.activeModule")}>
             {activeModule === "ai" ? <AISettingsModule /> : null}
+            {activeModule === "style-prompts" ? <StylePromptsModule /> : null}
             {activeModule === "local-data" ? <LocalDataModule /> : null}
             {activeModule === "performance" ? <PerformanceModule /> : null}
           </section>
@@ -258,7 +284,10 @@ function AISettingsModule() {
               checked={settings.thinkingEnabled}
               onCheckedChange={(thinkingEnabled) => setSettings((currentSettings) => ({ ...currentSettings, thinkingEnabled }))}
               aria-label={t("settings.ai.thinkingModeLabel")}
-            />
+              className="dark:data-unchecked:border-border dark:data-unchecked:bg-secondary"
+            >
+              <SwitchThumb className="dark:data-checked:bg-primary-foreground dark:data-unchecked:bg-muted-foreground" />
+            </Switch>
           </PreferenceRow>
         </div>
       </section>
@@ -279,6 +308,227 @@ function AISettingsModule() {
         </div>
       </section>
     </ModuleShell>
+  );
+}
+
+function StylePromptsModule() {
+  const { t } = useTranslation();
+  const [stylePrompts, setStylePrompts] = useState<StylePrompt[]>([]);
+  const [editorState, setEditorState] = useState<StylePromptEditorState | null>(null);
+  const [draftName, setDraftName] = useState("");
+  const [draftPrompt, setDraftPrompt] = useState("");
+  const isEditorOpen = editorState !== null;
+
+  useEffect(() => {
+    let isMounted = true;
+
+    getSavedStylePrompts().then((savedPrompts) => {
+      if (isMounted) {
+        setStylePrompts(savedPrompts);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  async function handleUpdateStylePrompt(id: string, nextPrompt: { name: string; prompt: string }) {
+    const nextStylePrompts = await updateStylePrompt(id, nextPrompt);
+
+    setStylePrompts(nextStylePrompts);
+  }
+
+  async function handleDeleteStylePrompt(id: string) {
+    const nextStylePrompts = await deleteStylePrompt(id);
+
+    setStylePrompts(nextStylePrompts);
+  }
+
+  function openCreateEditor() {
+    setDraftName("");
+    setDraftPrompt("");
+    setEditorState({ mode: "create" });
+  }
+
+  function openEditEditor(stylePrompt: StylePrompt) {
+    setDraftName(stylePrompt.name);
+    setDraftPrompt(stylePrompt.prompt);
+    setEditorState({ mode: "edit", stylePrompt });
+  }
+
+  function closeEditor() {
+    setEditorState(null);
+  }
+
+  async function handleSaveStylePrompt() {
+    if (!draftName.trim() || !draftPrompt.trim()) {
+      return;
+    }
+
+    if (editorState?.mode === "edit") {
+      await handleUpdateStylePrompt(editorState.stylePrompt.id, { name: draftName, prompt: draftPrompt });
+    } else {
+      const nextStylePrompts = await addStylePrompt({ name: draftName, prompt: draftPrompt });
+
+      setStylePrompts(nextStylePrompts);
+    }
+
+    closeEditor();
+  }
+
+  return (
+    <ModuleShell
+      title={t("settings.stylePrompts.title")}
+      description={t("settings.stylePrompts.description")}
+      icon={<Palette aria-hidden="true" />}
+      contained
+    >
+      <ScrollArea className="min-h-0 flex-1 overflow-hidden overscroll-contain">
+        <section className="grid gap-5 p-4 md:p-6" aria-label={t("settings.stylePrompts.addSection")}>
+          <div className="flex flex-col gap-3 rounded-lg border bg-card p-4 shadow-[0_1px_2px_rgb(17_24_39/0.03)] md:flex-row md:items-center md:justify-between">
+            <div className="min-w-0">
+              <h3 className="text-sm font-semibold">{t("settings.stylePrompts.addSection")}</h3>
+              <p className="text-sm text-muted-foreground">{t("settings.stylePrompts.addDescription")}</p>
+            </div>
+            <Button type="button" className="rounded-full px-4" onClick={openCreateEditor}>
+              <Plus data-icon="inline-start" />
+              {t("settings.stylePrompts.addAction")}
+            </Button>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-2">
+            {stylePrompts.map((stylePrompt) => (
+              <StylePromptCard
+                key={stylePrompt.id}
+                stylePrompt={stylePrompt}
+                onEdit={openEditEditor}
+                onDelete={handleDeleteStylePrompt}
+              />
+            ))}
+          </div>
+        </section>
+      </ScrollArea>
+      {isEditorOpen ? (
+        <Drawer direction="right" open onOpenChange={(open) => {
+          if (!open) {
+            closeEditor();
+          }
+        }}>
+          <DrawerContent className="w-[min(42rem,calc(100vw-1rem))] sm:max-w-none">
+            <DrawerHeader className="border-b bg-muted/35">
+              <DrawerTitle>
+                {t(editorState.mode === "edit" ? "settings.stylePrompts.editDrawerTitle" : "settings.stylePrompts.addSection")}
+              </DrawerTitle>
+              <DrawerDescription>
+                {t(editorState.mode === "edit" ? "settings.stylePrompts.editDrawerDescription" : "settings.stylePrompts.addDescription")}
+              </DrawerDescription>
+            </DrawerHeader>
+            <ScrollArea className="min-h-0 flex-1 overflow-hidden overscroll-contain">
+              <div className="grid gap-5 p-4">
+                <SettingsField id="style-prompt-name" label={t("settings.stylePrompts.nameLabel")} description={t("settings.stylePrompts.nameDescription")}>
+                  <Input
+                    id="style-prompt-name"
+                    name="style-prompt-name"
+                    value={draftName}
+                    onChange={(event) => setDraftName(event.target.value)}
+                    autoComplete="off"
+                  />
+                </SettingsField>
+
+                <SettingsField id="style-prompt" label={t("settings.stylePrompts.promptLabel")} description={t("settings.stylePrompts.promptDescription")}>
+                  <Textarea
+                    id="style-prompt"
+                    name="style-prompt"
+                    value={draftPrompt}
+                    onChange={(event) => setDraftPrompt(event.target.value)}
+                    className="min-h-[22rem] resize-y overflow-auto whitespace-pre-wrap font-mono text-sm leading-5"
+                  />
+                </SettingsField>
+              </div>
+            </ScrollArea>
+            <DrawerFooter className="border-t bg-card sm:flex-row sm:justify-end">
+              <DrawerClose asChild>
+                <Button type="button" variant="outline">
+                  {t("common.actions.cancel")}
+                </Button>
+              </DrawerClose>
+              <Button type="button" className="rounded-full px-4" onClick={handleSaveStylePrompt} disabled={!draftName.trim() || !draftPrompt.trim()}>
+                {t(editorState.mode === "edit" ? "settings.stylePrompts.saveAction" : "settings.stylePrompts.addAction")}
+              </Button>
+            </DrawerFooter>
+          </DrawerContent>
+        </Drawer>
+      ) : null}
+    </ModuleShell>
+  );
+}
+
+function StylePromptCard({
+  stylePrompt,
+  onEdit,
+  onDelete,
+}: {
+  stylePrompt: StylePrompt;
+  onEdit: (stylePrompt: StylePrompt) => void;
+  onDelete: (id: string) => Promise<void>;
+}) {
+  const { t } = useTranslation();
+  const isBuiltIn = stylePrompt.source === "built-in";
+  const displayName = isBuiltIn ? t(`settings.stylePrompts.builtIns.${stylePrompt.id}.name`) : stylePrompt.name;
+  const displayPrompt = isBuiltIn ? t(`settings.stylePrompts.builtIns.${stylePrompt.id}.prompt`) : stylePrompt.prompt;
+
+  return (
+    <article
+      aria-label={displayName}
+      className={cn(
+        "group flex min-h-36 flex-col overflow-hidden rounded-lg border bg-card p-4 shadow-[0_1px_2px_rgb(17_24_39/0.03)] transition-[border-color,box-shadow,transform] hover:-translate-y-px hover:shadow-[0_10px_28px_rgb(17_24_39/0.07)]",
+        isBuiltIn
+          ? "border-[color-mix(in_srgb,var(--ring),var(--border)_72%)]"
+          : "border-border"
+      )}
+    >
+      <div className="flex min-w-0 items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="truncate text-base font-semibold leading-6">{displayName}</h3>
+          <span className={cn(
+            "mt-1 inline-flex h-5 items-center rounded-md px-1.5 text-xs font-medium",
+            isBuiltIn
+              ? "bg-accent text-accent-foreground"
+              : "bg-secondary text-muted-foreground"
+          )}>
+            {t(isBuiltIn ? "settings.stylePrompts.builtInBadge" : "settings.stylePrompts.customBadge")}
+          </span>
+        </div>
+        {!isBuiltIn ? (
+          <div className="flex shrink-0 items-center gap-1 opacity-80 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              aria-label={t("settings.stylePrompts.editAction", { name: stylePrompt.name })}
+              onClick={() => onEdit(stylePrompt)}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <Pencil aria-hidden="true" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              aria-label={t("settings.stylePrompts.deleteAction", { name: stylePrompt.name })}
+              onClick={() => void onDelete(stylePrompt.id)}
+              className="text-muted-foreground hover:text-destructive"
+            >
+              <Trash2 aria-hidden="true" />
+            </Button>
+          </div>
+        ) : null}
+      </div>
+      <p className="mt-5 line-clamp-4 overflow-hidden border-t pt-3 text-sm leading-6 whitespace-pre-wrap break-words text-muted-foreground">
+        {displayPrompt}
+      </p>
+    </article>
   );
 }
 
@@ -397,6 +647,7 @@ function ModuleShell({
   status,
   statusTone = "default",
   icon,
+  contained = false,
   children,
 }: {
   title: string;
@@ -404,10 +655,14 @@ function ModuleShell({
   status?: string;
   statusTone?: "default" | "success";
   icon: React.ReactNode;
+  contained?: boolean;
   children: React.ReactNode;
 }) {
   return (
-    <article className="mx-auto max-w-4xl overflow-hidden rounded-lg border bg-card shadow-[0_1px_2px_rgb(17_24_39/0.04)]">
+    <article className={cn(
+      "w-full mx-auto max-w-4xl overflow-hidden rounded-lg border bg-card shadow-[0_1px_2px_rgb(17_24_39/0.04)]",
+      contained ? "flex h-full min-h-0 flex-col" : null
+    )}>
       <header className="flex flex-col gap-3 border-b bg-muted/20 p-4 md:flex-row md:items-start md:justify-between md:p-6">
         <div className="flex min-w-0 items-start gap-3">
           <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-accent text-accent-foreground ring-1 ring-ring/20">
@@ -421,7 +676,7 @@ function ModuleShell({
         {status ? (
           <div
             className={cn(
-              "inline-flex shrink-0 items-center gap-2 rounded-lg border bg-background px-2.5 py-1.5 text-sm",
+              "inline-flex shrink-0 items-center gap-2 rounded-lg border bg-card px-2.5 py-1.5 text-sm",
               statusTone === "success" ? "border-ring/30 bg-accent text-accent-foreground" : "text-muted-foreground"
             )}
           >
@@ -451,7 +706,7 @@ function SettingsField({ id, label, description, children }: { id: string; label
 
 function MetricCard({ value, label }: { value: string; label: string }) {
   return (
-    <div className="rounded-lg border bg-background p-4 shadow-[0_1px_2px_rgb(17_24_39/0.03)]">
+    <div className="rounded-lg border bg-card p-4 shadow-[0_1px_2px_rgb(17_24_39/0.03)]">
       <p className="text-2xl font-semibold tracking-normal">{value}</p>
       <p className="text-sm text-muted-foreground">{label}</p>
     </div>
@@ -462,7 +717,7 @@ function PreferenceRow({ label, description, children, compact = false }: { labe
   return (
     <div className={cn(
       "grid gap-3 border-b py-4 first:pt-0 md:grid-cols-[minmax(0,1fr)_auto] md:items-center",
-      compact ? "rounded-lg border bg-background px-3 py-3 first:pt-3" : null
+      compact ? "rounded-lg border bg-card px-3 py-3 first:pt-3" : null
     )}>
       <div className="min-w-0">
         <p className="text-sm font-medium">{label}</p>
