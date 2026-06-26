@@ -22,7 +22,7 @@ export async function* translateSourceContent(options: TranslateSourceContentOpt
     throw new Error("Missing AI provider settings");
   }
 
-  const result = streamText({
+  const streamOptions = {
     model: createOpenAICompatible({
       name: "user-provider",
       baseURL: options.settings.baseUrl,
@@ -30,13 +30,17 @@ export async function* translateSourceContent(options: TranslateSourceContentOpt
     }).chatModel(options.settings.model),
     system: buildTranslationSystemPrompt(options),
     prompt: options.sourceContent,
-    providerOptions: {
-      openaiCompatible: {
-        reasoningEffort: options.settings.thinkingEnabled ? "medium" : "none",
-      },
-    },
     abortSignal: options.abortSignal,
-  });
+    ...(options.settings.thinkingEnabled ? {
+      providerOptions: {
+      openaiCompatible: {
+          reasoningEffort: "medium",
+        },
+      },
+    } : null),
+  } satisfies Parameters<typeof streamText>[0];
+
+  const result = streamText(streamOptions);
 
   for await (const part of result.fullStream) {
     if (part.type === "reasoning-delta" && options.settings.thinkingEnabled) {

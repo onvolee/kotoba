@@ -51,7 +51,8 @@ import { useWorkspaceStore } from "../workspace-store";
 type SettingsModule = "ai" | "local-data" | "performance" | "style-prompts";
 type StylePromptEditorState =
   | { mode: "create" }
-  | { mode: "edit"; stylePrompt: StylePrompt };
+  | { mode: "edit"; stylePrompt: StylePrompt }
+  | { mode: "view"; stylePrompt: StylePrompt };
 
 const settingsModules: {
   id: SettingsModule;
@@ -319,6 +320,7 @@ function StylePromptsModule() {
   const [editorState, setEditorState] = useState<StylePromptEditorState | null>(null);
   const [draftName, setDraftName] = useState("");
   const [draftPrompt, setDraftPrompt] = useState("");
+  const [isConfirmingSave, setIsConfirmingSave] = useState(false);
   const isEditorOpen = editorState !== null;
 
   useEffect(() => {
@@ -350,27 +352,50 @@ function StylePromptsModule() {
   function openCreateEditor() {
     setDraftName("");
     setDraftPrompt("");
+    setIsConfirmingSave(false);
     setEditorState({ mode: "create" });
   }
 
   function openEditEditor(stylePrompt: StylePrompt) {
+    if (stylePrompt.source === "built-in") {
+      openViewEditor(stylePrompt);
+      return;
+    }
+
     setDraftName(stylePrompt.name);
     setDraftPrompt(stylePrompt.prompt);
+    setIsConfirmingSave(false);
     setEditorState({ mode: "edit", stylePrompt });
   }
 
+  function openViewEditor(stylePrompt: StylePrompt) {
+    setDraftName("");
+    setDraftPrompt("");
+    setIsConfirmingSave(false);
+    setEditorState({ mode: "view", stylePrompt });
+  }
+
   function closeEditor() {
+    setIsConfirmingSave(false);
     setEditorState(null);
   }
 
-  async function handleSaveStylePrompt() {
+  function handleRequestSaveStylePrompt() {
+    if (!draftName.trim() || !draftPrompt.trim()) {
+      return;
+    }
+
+    setIsConfirmingSave(true);
+  }
+
+  async function handleConfirmSaveStylePrompt() {
     if (!draftName.trim() || !draftPrompt.trim()) {
       return;
     }
 
     if (editorState?.mode === "edit") {
       await handleUpdateStylePrompt(editorState.stylePrompt.id, { name: draftName, prompt: draftPrompt });
-    } else {
+    } else if (editorState?.mode === "create") {
       const nextStylePrompts = await addStylePrompt({ name: draftName, prompt: draftPrompt });
 
       setStylePrompts(nextStylePrompts);
@@ -405,6 +430,7 @@ function StylePromptsModule() {
               <StylePromptCard
                 key={stylePrompt.id}
                 stylePrompt={stylePrompt}
+                onView={openViewEditor}
                 onEdit={openEditEditor}
                 onDelete={handleDeleteStylePrompt}
               />
@@ -420,35 +446,47 @@ function StylePromptsModule() {
         }}>
           <DrawerContent className="w-[min(42rem,calc(100vw-1rem))] sm:max-w-none">
             <DrawerHeader className="border-b bg-muted/35">
-              <DrawerTitle>
-                {t(editorState.mode === "edit" ? "settings.stylePrompts.editDrawerTitle" : "settings.stylePrompts.addSection")}
-              </DrawerTitle>
+              <DrawerTitle>{getStylePromptEditorTitle(editorState, t)}</DrawerTitle>
               <DrawerDescription>
-                {t(editorState.mode === "edit" ? "settings.stylePrompts.editDrawerDescription" : "settings.stylePrompts.addDescription")}
+                {getStylePromptEditorDescription(editorState, t)}
               </DrawerDescription>
             </DrawerHeader>
             <ScrollArea className="min-h-0 flex-1 overflow-hidden overscroll-contain">
-              <div className="grid gap-5 p-4">
-                <SettingsField id="style-prompt-name" label={t("settings.stylePrompts.nameLabel")} description={t("settings.stylePrompts.nameDescription")}>
-                  <Input
-                    id="style-prompt-name"
-                    name="style-prompt-name"
-                    value={draftName}
-                    onChange={(event) => setDraftName(event.target.value)}
-                    autoComplete="off"
-                  />
-                </SettingsField>
+              {editorState.mode === "view" ? (
+                <div className="grid gap-3 p-4">
+                  <p className="whitespace-pre-wrap break-words rounded-lg border bg-card p-4 font-mono text-sm leading-6 text-muted-foreground">
+                    {getStylePromptDisplayPrompt(editorState.stylePrompt, t)}
+                  </p>
+                </div>
+              ) : (
+                <div className="grid gap-5 p-4">
+                  <SettingsField id="style-prompt-name" label={t("settings.stylePrompts.nameLabel")} description={t("settings.stylePrompts.nameDescription")}>
+                    <Input
+                      id="style-prompt-name"
+                      name="style-prompt-name"
+                      value={draftName}
+                      onChange={(event) => {
+                        setDraftName(event.target.value);
+                        setIsConfirmingSave(false);
+                      }}
+                      autoComplete="off"
+                    />
+                  </SettingsField>
 
-                <SettingsField id="style-prompt" label={t("settings.stylePrompts.promptLabel")} description={t("settings.stylePrompts.promptDescription")}>
-                  <Textarea
-                    id="style-prompt"
-                    name="style-prompt"
-                    value={draftPrompt}
-                    onChange={(event) => setDraftPrompt(event.target.value)}
-                    className="min-h-[22rem] resize-y overflow-auto whitespace-pre-wrap font-mono text-sm leading-5"
-                  />
-                </SettingsField>
-              </div>
+                  <SettingsField id="style-prompt" label={t("settings.stylePrompts.promptLabel")} description={t("settings.stylePrompts.promptDescription")}>
+                    <Textarea
+                      id="style-prompt"
+                      name="style-prompt"
+                      value={draftPrompt}
+                      onChange={(event) => {
+                        setDraftPrompt(event.target.value);
+                        setIsConfirmingSave(false);
+                      }}
+                      className="min-h-[22rem] resize-y overflow-auto whitespace-pre-wrap font-mono text-sm leading-5"
+                    />
+                  </SettingsField>
+                </div>
+              )}
             </ScrollArea>
             <DrawerFooter className="border-t bg-card sm:flex-row sm:justify-end">
               <DrawerClose asChild>
@@ -456,9 +494,22 @@ function StylePromptsModule() {
                   {t("common.actions.cancel")}
                 </Button>
               </DrawerClose>
-              <Button type="button" className="rounded-full px-4" onClick={handleSaveStylePrompt} disabled={!draftName.trim() || !draftPrompt.trim()}>
-                {t(editorState.mode === "edit" ? "settings.stylePrompts.saveAction" : "settings.stylePrompts.addAction")}
-              </Button>
+              {editorState.mode !== "view" ? (
+                <>
+                  {isConfirmingSave ? (
+                    <p className="mr-auto self-center text-sm text-muted-foreground">{t("settings.stylePrompts.saveConfirmDescription")}</p>
+                  ) : null}
+                  {isConfirmingSave ? (
+                    <Button type="button" className="rounded-full px-4" onClick={handleConfirmSaveStylePrompt}>
+                      {t("settings.stylePrompts.confirmSaveAction")}
+                    </Button>
+                  ) : (
+                    <Button type="button" className="rounded-full px-4" onClick={handleRequestSaveStylePrompt} disabled={!draftName.trim() || !draftPrompt.trim()}>
+                      {t(editorState.mode === "edit" ? "settings.stylePrompts.saveAction" : "settings.stylePrompts.addAction")}
+                    </Button>
+                  )}
+                </>
+              ) : null}
             </DrawerFooter>
           </DrawerContent>
         </Drawer>
@@ -469,23 +520,33 @@ function StylePromptsModule() {
 
 function StylePromptCard({
   stylePrompt,
+  onView,
   onEdit,
   onDelete,
 }: {
   stylePrompt: StylePrompt;
+  onView: (stylePrompt: StylePrompt) => void;
   onEdit: (stylePrompt: StylePrompt) => void;
   onDelete: (id: string) => Promise<void>;
 }) {
   const { t } = useTranslation();
   const isBuiltIn = stylePrompt.source === "built-in";
-  const displayName = isBuiltIn ? t(`settings.stylePrompts.builtIns.${stylePrompt.id}.name`) : stylePrompt.name;
-  const displayPrompt = isBuiltIn ? t(`settings.stylePrompts.builtIns.${stylePrompt.id}.prompt`) : stylePrompt.prompt;
+  const displayName = getStylePromptDisplayName(stylePrompt, t);
+  const displayPrompt = getStylePromptDisplayPrompt(stylePrompt, t);
 
   return (
     <article
       aria-label={displayName}
+      tabIndex={0}
+      onClick={() => onView(stylePrompt)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onView(stylePrompt);
+        }
+      }}
       className={cn(
-        "group flex min-h-36 flex-col overflow-hidden rounded-lg border bg-card p-4 shadow-[0_1px_2px_rgb(17_24_39/0.03)] transition-[border-color,box-shadow,transform] hover:-translate-y-px hover:shadow-[0_10px_28px_rgb(17_24_39/0.07)]",
+        "group flex min-h-36 cursor-pointer flex-col overflow-hidden rounded-lg border bg-card p-4 shadow-[0_1px_2px_rgb(17_24_39/0.03)] transition-[border-color,box-shadow,transform] outline-none hover:-translate-y-px hover:shadow-[0_10px_28px_rgb(17_24_39/0.07)] focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
         isBuiltIn
           ? "border-[color-mix(in_srgb,var(--ring),var(--border)_72%)]"
           : "border-border"
@@ -510,7 +571,10 @@ function StylePromptCard({
               variant="ghost"
               size="icon-sm"
               aria-label={t("settings.stylePrompts.editAction", { name: stylePrompt.name })}
-              onClick={() => onEdit(stylePrompt)}
+              onClick={(event) => {
+                event.stopPropagation();
+                onEdit(stylePrompt);
+              }}
               className="text-muted-foreground hover:text-foreground"
             >
               <Pencil aria-hidden="true" />
@@ -520,7 +584,10 @@ function StylePromptCard({
               variant="ghost"
               size="icon-sm"
               aria-label={t("settings.stylePrompts.deleteAction", { name: stylePrompt.name })}
-              onClick={() => void onDelete(stylePrompt.id)}
+              onClick={(event) => {
+                event.stopPropagation();
+                void onDelete(stylePrompt.id);
+              }}
               className="text-muted-foreground hover:text-destructive"
             >
               <Trash2 aria-hidden="true" />
@@ -533,6 +600,30 @@ function StylePromptCard({
       </p>
     </article>
   );
+}
+
+function getStylePromptEditorTitle(editorState: StylePromptEditorState, t: ReturnType<typeof useTranslation>["t"]): string {
+  if (editorState.mode === "view") {
+    return getStylePromptDisplayName(editorState.stylePrompt, t);
+  }
+
+  return t(editorState.mode === "edit" ? "settings.stylePrompts.editDrawerTitle" : "settings.stylePrompts.addSection");
+}
+
+function getStylePromptEditorDescription(editorState: StylePromptEditorState, t: ReturnType<typeof useTranslation>["t"]): string {
+  if (editorState.mode === "view") {
+    return t("settings.stylePrompts.viewDrawerDescription");
+  }
+
+  return t(editorState.mode === "edit" ? "settings.stylePrompts.editDrawerDescription" : "settings.stylePrompts.addDescription");
+}
+
+function getStylePromptDisplayName(stylePrompt: StylePrompt, t: ReturnType<typeof useTranslation>["t"]): string {
+  return stylePrompt.source === "built-in" ? t(`settings.stylePrompts.builtIns.${stylePrompt.id}.name`) : stylePrompt.name;
+}
+
+function getStylePromptDisplayPrompt(stylePrompt: StylePrompt, t: ReturnType<typeof useTranslation>["t"]): string {
+  return stylePrompt.source === "built-in" ? t(`settings.stylePrompts.builtIns.${stylePrompt.id}.prompt`) : stylePrompt.prompt;
 }
 
 function toAISettings(settings: AISettings): AISettings {
@@ -575,7 +666,7 @@ function LocalDataModule() {
 function PerformanceModule() {
   const { t } = useTranslation();
   const [uiLanguagePreference, setUiLanguagePreference] = useState<UiLanguagePreference>("browser");
-  const [themePreference, setThemePreference] = useState<WorkspaceThemePreference>("Light");
+  const [themePreference, setThemePreference] = useState<WorkspaceThemePreference>("System");
 
   useEffect(() => {
     let isMounted = true;
@@ -619,6 +710,7 @@ function PerformanceModule() {
           <CompactSegmentedControl
             ariaLabel={t("settings.preferences.themeLabel")}
             options={[
+              { value: "System", label: t("settings.preferences.system") },
               { value: "Light", label: t("settings.preferences.light") },
               { value: "Dark", label: t("settings.preferences.dark") },
             ]}

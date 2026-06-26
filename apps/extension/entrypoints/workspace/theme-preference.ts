@@ -1,15 +1,15 @@
 import { storage } from "wxt/utils/storage";
 
-export type WorkspaceThemePreference = "Light" | "Dark";
+export type WorkspaceThemePreference = "System" | "Light" | "Dark";
 
 const themePreferenceKey = "local:theme-preference";
 
 export async function getSavedThemePreference(): Promise<WorkspaceThemePreference> {
   const value = await storage.getItem<WorkspaceThemePreference>(themePreferenceKey, {
-    fallback: "Light",
+    fallback: "System",
   });
 
-  return isThemePreference(value) ? value : "Light";
+  return isThemePreference(value) ? value : "System";
 }
 
 export async function applyThemePreference(preference: WorkspaceThemePreference) {
@@ -22,9 +22,10 @@ export async function applySavedThemePreference() {
 }
 
 function applyThemeClass(preference: WorkspaceThemePreference) {
-  document.documentElement.classList.toggle("dark", preference === "Dark");
+  const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  document.documentElement.classList.toggle("dark", preference === "Dark" || (preference === "System" && prefersDark));
 }
 
 function isThemePreference(value: unknown): value is WorkspaceThemePreference {
-  return value === "Light" || value === "Dark";
+  return value === "System" || value === "Light" || value === "Dark";
 }

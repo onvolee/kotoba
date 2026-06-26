@@ -1,6 +1,7 @@
 import { Component, useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   ArrowRightLeft,
+  CircleAlert,
   Clipboard,
   Download,
   FileText,
@@ -106,6 +107,7 @@ export function WorkspacePage({ onOpenSettings }: WorkspacePageProps) {
     sourceContent,
     translationContent,
     translationThinkingContent,
+    translationErrorMessage,
     sourceViewFormat,
     translationViewFormat,
     historyRecords,
@@ -114,6 +116,7 @@ export function WorkspacePage({ onOpenSettings }: WorkspacePageProps) {
     setSourceContent,
     setTranslationContent,
     setTranslationThinkingContent,
+    setTranslationErrorMessage,
     setSourceViewFormat,
     setTranslationViewFormat,
     setTranslationStatus,
@@ -169,6 +172,7 @@ export function WorkspacePage({ onOpenSettings }: WorkspacePageProps) {
 
     if (!hasCompleteAISettings(providerSettings)) {
       setTranslationContent("");
+      setTranslationErrorMessage(t("workspace.missingProviderSettings"));
       setTranslationStatus("failed");
       toast.error(t("workspace.missingProviderSettings"));
       return;
@@ -180,6 +184,7 @@ export function WorkspacePage({ onOpenSettings }: WorkspacePageProps) {
     setTranslationStatus("streaming");
     setTranslationContent("");
     setTranslationThinkingContent("");
+    setTranslationErrorMessage("");
 
     let completedTranslation = "";
     let completedThinking = "";
@@ -232,6 +237,11 @@ export function WorkspacePage({ onOpenSettings }: WorkspacePageProps) {
       }
 
       setTranslationStatus("failed");
+      const failureMessage = getTranslationFailureMessage(error);
+      setTranslationErrorMessage(failureMessage);
+      toast.error(t("workspace.panels.translation.requestFailedToast"), {
+        description: failureMessage,
+      });
     } finally {
       if (activeTranslationAbortControllerRef.current === abortController) {
         activeTranslationAbortControllerRef.current = null;
@@ -545,6 +555,13 @@ export function WorkspacePage({ onOpenSettings }: WorkspacePageProps) {
               placeholder={t("workspace.panels.translation.placeholder")}
               viewFormat={translationViewFormat}
             />
+            {translationStatus === "failed" && translationErrorMessage ? (
+              <TranslationErrorPanel
+                description={t("workspace.panels.translation.errorDescription")}
+                message={translationErrorMessage}
+                title={t("workspace.panels.translation.requestFailedToast")}
+              />
+            ) : null}
             {shouldShowThinkingStatus ? (
               <ThinkingStatusPanel content={translationThinkingContent} />
             ) : null}
@@ -563,6 +580,18 @@ function hasCompleteAISettings(settings: AISettings): boolean {
 
 function isAbortError(error: unknown): boolean {
   return error instanceof DOMException && error.name === "AbortError";
+}
+
+function getTranslationFailureMessage(error: unknown): string {
+  if (error instanceof Error && error.message.trim().length > 0) {
+    return error.message;
+  }
+
+  if (typeof error === "string" && error.trim().length > 0) {
+    return error;
+  }
+
+  return "Unknown provider error";
 }
 
 type WorkspacePanelProps = {
@@ -1142,6 +1171,27 @@ function EmptyContentPlaceholder({ children }: { children?: string }) {
     <p className="max-w-md text-sm leading-6 text-muted-foreground/75">
       {children}
     </p>
+  );
+}
+
+type TranslationErrorPanelProps = {
+  title: string;
+  message: string;
+  description: string;
+};
+
+function TranslationErrorPanel({ title, message, description }: TranslationErrorPanelProps) {
+  return (
+    <div className="absolute inset-0 flex items-start bg-card/95 p-4">
+      <div className="grid max-w-xl gap-3 rounded-lg border border-destructive/25 bg-destructive/5 p-4 text-sm shadow-sm">
+        <div className="flex items-center gap-2 font-semibold text-destructive">
+          <CircleAlert aria-hidden="true" className="size-4" />
+          <span>{title}</span>
+        </div>
+        <p className="break-words font-mono text-xs leading-5 text-foreground">{message}</p>
+        <p className="leading-6 text-muted-foreground">{description}</p>
+      </div>
+    </div>
   );
 }
 

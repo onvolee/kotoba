@@ -14,6 +14,7 @@ export type WorkspaceState = {
   sourceContent: string;
   translationContent: string;
   translationThinkingContent: string;
+  translationErrorMessage: string;
   sourceViewFormat: ContentFormat;
   translationViewFormat: ContentFormat;
   historyRecords: TranslationHistoryRecord[];
@@ -22,6 +23,7 @@ export type WorkspaceState = {
   setSourceContent: (sourceContent: string) => void;
   setTranslationContent: (translationContent: string) => void;
   setTranslationThinkingContent: (translationThinkingContent: string) => void;
+  setTranslationErrorMessage: (translationErrorMessage: string) => void;
   setSourceViewFormat: (sourceViewFormat: ContentFormat) => void;
   setTranslationViewFormat: (translationViewFormat: ContentFormat) => void;
   setTranslationStatus: (translationStatus: TranslationStatus) => void;
@@ -39,6 +41,7 @@ const initialWorkspaceValues = {
   sourceContent: "",
   translationContent: "",
   translationThinkingContent: "",
+  translationErrorMessage: "",
   sourceViewFormat: "Markdown" as const,
   translationViewFormat: "Markdown" as const,
   historyRecords: [] as TranslationHistoryRecord[],
@@ -50,14 +53,16 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   sourceContent: initialWorkspaceValues.sourceContent,
   translationContent: initialWorkspaceValues.translationContent,
   translationThinkingContent: initialWorkspaceValues.translationThinkingContent,
+  translationErrorMessage: initialWorkspaceValues.translationErrorMessage,
   sourceViewFormat: initialWorkspaceValues.sourceViewFormat,
   translationViewFormat: initialWorkspaceValues.translationViewFormat,
   historyRecords: initialWorkspaceValues.historyRecords,
   translationStatus: initialWorkspaceValues.translationStatus,
   setTranslationDirection: (translationDirection) => set({ translationDirection }),
-  setSourceContent: (sourceContent) => set({ sourceContent, translationStatus: "idle" }),
-  setTranslationContent: (translationContent) => set({ translationContent }),
+  setSourceContent: (sourceContent) => set({ sourceContent, translationStatus: "idle", translationErrorMessage: "" }),
+  setTranslationContent: (translationContent) => set({ translationContent, translationErrorMessage: "" }),
   setTranslationThinkingContent: (translationThinkingContent) => set({ translationThinkingContent }),
+  setTranslationErrorMessage: (translationErrorMessage) => set({ translationErrorMessage }),
   setSourceViewFormat: (sourceViewFormat) => set({ sourceViewFormat }),
   setTranslationViewFormat: (translationViewFormat) => set({ translationViewFormat }),
   setTranslationStatus: (translationStatus) => set({
@@ -68,10 +73,12 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
     sourceContent: "",
     translationStatus: "idle",
     translationThinkingContent: "",
+    translationErrorMessage: "",
   }),
   clearTranslationContent: () => set({
     translationContent: "",
     translationThinkingContent: "",
+    translationErrorMessage: "",
     translationStatus: "idle",
   }),
   hydrateHistoryRecords: (records) => set({ historyRecords: records }),
@@ -100,6 +107,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
     sourceContent: record.sourceContent,
     translationContent: record.translatedContent,
     translationThinkingContent: "",
+    translationErrorMessage: "",
     sourceViewFormat: record.sourceContentFormat,
     translationViewFormat: record.translationContentFormat,
     translationStatus: "completed",

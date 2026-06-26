@@ -59,12 +59,10 @@ describe("translation service", () => {
     expect(aiMocks.chatModel).toHaveBeenCalledWith("example-chat");
     expect(aiMocks.streamText).toHaveBeenCalledWith(expect.objectContaining({
       prompt: "# Title",
-      providerOptions: {
-        openaiCompatible: {
-          reasoningEffort: "none",
-        },
-      },
       system: expect.stringMatching(/Translate English to Simplified Chinese.[\s\S]*Use technical translation rules./),
+    }));
+    expect(aiMocks.streamText).toHaveBeenCalledWith(expect.not.objectContaining({
+      providerOptions: expect.anything(),
     }));
   });
 

@@ -1,5 +1,7 @@
+import i18n from "i18next";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { initReactI18next } from "react-i18next";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fakeBrowser } from "wxt/testing";
 import { Toaster } from "@/components/ui/sonner";
@@ -82,18 +84,84 @@ describe("workspace shell", () => {
 
     await user.click(await screen.findByRole("button", { name: "打开设置" }));
 
-    expect(screen.getByRole("heading", { name: "性能", level: 2 })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "通用", level: 2 })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /AI 设置/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /本地数据/ })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "显示" })).toBeInTheDocument();
     expect(screen.getByRole("group", { name: "界面语言" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "跟随浏览器语言" })).toBeInTheDocument();
     expect(screen.getByRole("group", { name: "主题" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "跟随系统" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "浅色" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "深色" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /风格提示词/ }));
     expect(screen.getByRole("article", { name: "编程技术" })).toBeInTheDocument();
     expect(screen.getByRole("article", { name: "通用" })).toBeInTheDocument();
+  });
+
+  it("refreshes initialized translations before showing Chinese style prompt save confirmation", async () => {
+    const user = userEvent.setup();
+    setBrowserLanguage("zh-CN");
+    window.location.hash = "#settings";
+    i18n.isInitialized = false;
+    await i18n.use(initReactI18next).init({
+      fallbackLng: "en",
+      interpolation: {
+        escapeValue: false,
+      },
+      lng: "zh-CN",
+      resources: {
+        en: {
+          translation: {
+            common: {
+              actions: {
+                cancel: "Cancel",
+              },
+            },
+          },
+        },
+        "zh-CN": {
+          translation: {
+            common: {
+              actions: {
+                cancel: "取消",
+              },
+            },
+          },
+        },
+      },
+    });
+    replaceWorkspaceResourcesForTest({
+      en: {
+        common: {
+          actions: {
+            cancel: "Cancel",
+          },
+        },
+      },
+      "zh-CN": {
+        common: {
+          actions: {
+            cancel: "取消",
+          },
+        },
+      },
+    });
+
+    render(<App />);
+
+    await user.click(await screen.findByRole("button", { name: /风格提示词/ }));
+    await user.click(screen.getByRole("button", { name: "添加风格提示词" }));
+
+    const promptEditor = await screen.findByRole("dialog", { name: "新风格提示词" });
+    await user.type(within(promptEditor).getByLabelText("风格名称"), "测试");
+    await user.type(within(promptEditor).getByLabelText("提示词"), "保持简洁。");
+    await user.click(within(promptEditor).getByRole("button", { name: "添加风格提示词" }));
+
+    expect(await within(promptEditor).findByText("保存这个自定义风格提示词？")).toBeInTheDocument();
+    expect(within(promptEditor).getByRole("button", { name: "确认保存" })).toBeInTheDocument();
+    expect(within(promptEditor).queryByText("settings.stylePrompts.saveConfirmDescription")).not.toBeInTheDocument();
+    expect(within(promptEditor).queryByRole("button", { name: "settings.stylePrompts.confirmSaveAction" })).not.toBeInTheDocument();
   });
 
   it("lets users manage AI style prompts from settings", async () => {
@@ -114,9 +182,28 @@ describe("workspace shell", () => {
     await user.type(within(promptEditor).getByLabelText("Style name"), "Release notes");
     await user.type(within(promptEditor).getByLabelText("Prompt"), "Translate release notes with concise product language.");
     await user.click(within(promptEditor).getByRole("button", { name: "Add style prompt" }));
+    expect(await screen.findByText("Save this custom style prompt?")).toBeInTheDocument();
+    expect(screen.queryByRole("article", { name: "Release notes" })).not.toBeInTheDocument();
+    await user.click(within(promptEditor).getByRole("button", { name: "Confirm save" }));
 
     expect(screen.getByRole("article", { name: "Release notes" })).toHaveTextContent("Translate release notes with concise product language.");
     expect(screen.queryByRole("dialog", { name: "New style prompt" })).not.toBeInTheDocument();
+  });
+
+  it("opens built-in style prompts as read-only", async () => {
+    const user = userEvent.setup();
+
+    render(<App />);
+
+    await user.click(await screen.findByRole("button", { name: "Open settings" }));
+    await user.click(screen.getByRole("button", { name: /Style prompts/ }));
+    await user.click(screen.getByRole("article", { name: "Programming technology" }));
+
+    const promptViewer = await screen.findByRole("dialog", { name: "Programming technology" });
+    expect(within(promptViewer).getByText(/professional translator specializing in programming/)).toBeInTheDocument();
+    expect(within(promptViewer).queryByRole("textbox", { name: "Style name" })).not.toBeInTheDocument();
+    expect(within(promptViewer).queryByRole("textbox", { name: "Prompt" })).not.toBeInTheDocument();
+    expect(within(promptViewer).queryByRole("button", { name: "Save style prompt" })).not.toBeInTheDocument();
   });
 
   it("shows saved custom style prompts when settings is opened again", async () => {
@@ -131,6 +218,7 @@ describe("workspace shell", () => {
     await user.type(within(promptEditor).getByLabelText("Style name"), "Support reply");
     await user.type(within(promptEditor).getByLabelText("Prompt"), "Use concise, friendly support language.");
     await user.click(within(promptEditor).getByRole("button", { name: "Add style prompt" }));
+    await user.click(within(promptEditor).getByRole("button", { name: "Confirm save" }));
 
     firstRender.unmount();
     window.location.hash = "#settings";
@@ -155,6 +243,7 @@ describe("workspace shell", () => {
     await user.type(within(createEditor).getByLabelText("Style name"), "Draft voice");
     await user.type(within(createEditor).getByLabelText("Prompt"), "Use draft wording.");
     await user.click(within(createEditor).getByRole("button", { name: "Add style prompt" }));
+    await user.click(within(createEditor).getByRole("button", { name: "Confirm save" }));
 
     const customCard = screen.getByRole("article", { name: "Draft voice" });
     await user.click(within(customCard).getByRole("button", { name: "Edit Draft voice" }));
@@ -165,6 +254,7 @@ describe("workspace shell", () => {
     await user.clear(within(editEditor).getByLabelText("Prompt"));
     await user.type(within(editEditor).getByLabelText("Prompt"), "Use precise review language.");
     await user.click(within(editEditor).getByRole("button", { name: "Save style prompt" }));
+    await user.click(within(editEditor).getByRole("button", { name: "Confirm save" }));
 
     expect(screen.getByRole("article", { name: "Review voice" })).toHaveTextContent("Use precise review language.");
     expect(screen.queryByRole("article", { name: "Draft voice" })).not.toBeInTheDocument();
@@ -182,10 +272,11 @@ describe("workspace shell", () => {
     await user.click(await screen.findByRole("button", { name: "Open settings" }));
 
     expect(screen.getByRole("heading", { name: "Settings", level: 1 })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Performance" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "General" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Display" })).toBeInTheDocument();
     expect(screen.getByRole("group", { name: "UI language" })).toBeInTheDocument();
     expect(screen.getByRole("group", { name: "Theme" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "System" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("link", { name: "Back to workspace" })).toHaveAttribute("href", "#");
   });
 
@@ -272,6 +363,7 @@ describe("workspace shell", () => {
     await user.type(within(promptEditor).getByLabelText("Style name"), "Release notes");
     await user.type(within(promptEditor).getByLabelText("Prompt"), "Translate release notes with concise product language.");
     await user.click(within(promptEditor).getByRole("button", { name: "Add style prompt" }));
+    await user.click(within(promptEditor).getByRole("button", { name: "Confirm save" }));
 
     expect(await screen.findByText("Settings saved")).toBeInTheDocument();
   });
@@ -451,6 +543,33 @@ describe("workspace shell", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "简体中文" })).toHaveAttribute("aria-pressed", "true"));
   });
 
+  it("follows the system theme by default", async () => {
+    setSystemColorScheme("dark");
+
+    render(<App />);
+
+    expect(await screen.findByRole("button", { name: "Translate" })).toBeInTheDocument();
+    expect(document.documentElement).toHaveClass("dark");
+  });
+
+  it("persists an explicit light theme over system theme", async () => {
+    const user = userEvent.setup();
+    const firstRender = render(<App />);
+
+    await user.click(await screen.findByRole("button", { name: "Open settings" }));
+    expect(screen.getByRole("button", { name: "System" })).toHaveAttribute("aria-pressed", "true");
+    await user.click(screen.getByRole("button", { name: "Light" }));
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+
+    firstRender.unmount();
+    window.location.hash = "#settings";
+    resetWorkspaceI18nForTests();
+
+    render(<App />);
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "Light" })).toHaveAttribute("aria-pressed", "true"));
+  });
+
   it("renders the translation workspace controls and panels", async () => {
     const { container } = render(<App />);
 
@@ -585,6 +704,29 @@ describe("workspace shell", () => {
 
     expect(translationMocks.translateSourceContent).not.toHaveBeenCalled();
     expect(within(screen.getByRole("region", { name: "Translation" })).queryByRole("heading", { name: "发布说明" })).not.toBeInTheDocument();
+  });
+
+  it("shows a visible provider error when translation fails", async () => {
+    const user = userEvent.setup();
+    await saveAISettings({
+      baseUrl: "https://ark.cn-beijing.volces.com/api/coding/v3",
+      apiKey: "ark-test-key",
+      model: "deepseek-v4-pro",
+    });
+    translationMocks.translateSourceContent.mockImplementation(async function* () {
+      throw new Error("Provider returned 404 Not Found for /chat/completions");
+    });
+
+    renderAppWithToaster();
+    await setSourceMarkdown(user, "# Release notes");
+
+    await user.click(screen.getByRole("button", { name: "Translate" }));
+
+    const translationPanel = screen.getByRole("region", { name: "Translation" });
+    expect(await within(translationPanel).findByText("Translation failed")).toBeInTheDocument();
+    expect(await screen.findByText("Check the AI provider Base URL, API key, and model, then try again.")).toBeInTheDocument();
+    expect(within(translationPanel).getByText(/Provider returned 404 Not Found/)).toBeInTheDocument();
+    expect(within(translationPanel).getByText("Check the AI provider Base URL, API key, and model, then try again.")).toBeInTheDocument();
   });
 
   it("streams translation output into the translation panel and saves the completed record to history", async () => {
@@ -894,4 +1036,26 @@ function setBrowserLanguage(language: string) {
     value: language,
     configurable: true,
   });
+}
+
+function setSystemColorScheme(scheme: "light" | "dark") {
+  window.matchMedia = (query: string): MediaQueryList => ({
+    matches: query === "(prefers-color-scheme: dark)" && scheme === "dark",
+    media: query,
+    onchange: null,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+    addListener: () => undefined,
+    removeListener: () => undefined,
+    dispatchEvent: () => false,
+  });
+}
+
+function replaceWorkspaceResourcesForTest(resources: Record<"en" | "zh-CN", object>) {
+  for (const language of ["en", "zh-CN"] as const) {
+    if (i18n.hasResourceBundle(language, "translation")) {
+      i18n.removeResourceBundle(language, "translation");
+    }
+    i18n.addResourceBundle(language, "translation", resources[language], true, true);
+  }
 }

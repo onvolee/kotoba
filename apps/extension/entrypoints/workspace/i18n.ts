@@ -76,11 +76,13 @@ const resources = {
           translation: {
             copiedToast: "Translation copied",
             downloadFilename: "Download .zh.md",
+            errorDescription: "Check the AI provider Base URL, API key, and model, then try again.",
             formatLabel: "Translation display mode",
             footerStatus: "Successful translations will be saved locally",
             meta: "Ready · {{style}} · {{model}}",
             noModel: "No model configured",
             placeholder: "Translation output will appear here after you start translating.",
+            requestFailedToast: "Translation failed",
             thinkingTitle: "AI is thinking",
             title: "Translation",
           },
@@ -148,13 +150,14 @@ const resources = {
         },
         performance: {
           description: "Configure display preferences for the workspace interface.",
-          title: "Performance",
+          title: "General",
         },
         preferences: {
           browser: "Browser",
           dark: "Dark",
           followBrowserLanguage: "Follow browser language",
           light: "Light",
+          system: "System",
           themeDescription: "Display theme for the extension workspace.",
           themeLabel: "Theme",
           uiLanguageDescription: "Only changes Kotoba controls, not source content or translation output.",
@@ -178,6 +181,7 @@ const resources = {
             },
           },
           customBadge: "Custom",
+          confirmSaveAction: "Confirm save",
           deleteAction: "Delete {{name}}",
           description: "Manage reusable AI style prompts for translation tone and wording.",
           editAction: "Edit {{name}}",
@@ -190,7 +194,9 @@ const resources = {
           promptDescription: "Write the instruction the AI should follow for this style.",
           promptLabel: "Prompt",
           saveAction: "Save style prompt",
+          saveConfirmDescription: "Save this custom style prompt?",
           title: "Style prompts",
+          viewDrawerDescription: "Review this built-in prompt. Built-in prompts cannot be edited.",
         },
         title: "Settings",
         workspace: "Workspace",
@@ -263,11 +269,13 @@ const resources = {
           translation: {
             copiedToast: "译文已复制",
             downloadFilename: "下载 .zh.md",
+            errorDescription: "请检查 AI 服务的 Base URL、API Key 和模型名称，然后重试。",
             formatLabel: "译文显示模式",
             footerStatus: "成功翻译会保存在本地",
             meta: "就绪 · {{style}} · {{model}}",
             noModel: "未配置模型",
             placeholder: "开始翻译后，译文会显示在这里。",
+            requestFailedToast: "翻译失败",
             thinkingTitle: "AI 正在思考",
             title: "译文",
           },
@@ -335,13 +343,14 @@ const resources = {
         },
         performance: {
           description: "配置工作区界面的显示偏好。",
-          title: "性能",
+          title: "通用",
         },
         preferences: {
           browser: "浏览器",
           dark: "深色",
           followBrowserLanguage: "跟随浏览器语言",
           light: "浅色",
+          system: "跟随系统",
           themeDescription: "扩展工作区的显示主题。",
           themeLabel: "主题",
           uiLanguageDescription: "只改变 Kotoba 控件，不改变原文内容或译文输出。",
@@ -365,6 +374,7 @@ const resources = {
             },
           },
           customBadge: "自定义",
+          confirmSaveAction: "确认保存",
           deleteAction: "删除 {{name}}",
           description: "管理用于控制翻译语气和措辞的 AI 风格提示词。",
           editAction: "编辑 {{name}}",
@@ -377,7 +387,9 @@ const resources = {
           promptDescription: "写下 AI 在这个风格下需要遵循的指令。",
           promptLabel: "提示词",
           saveAction: "保存风格提示词",
+          saveConfirmDescription: "保存这个自定义风格提示词？",
           title: "风格提示词",
+          viewDrawerDescription: "查看这条内置提示词。内置提示词不能编辑。",
         },
         title: "设置",
         workspace: "工作区",
@@ -388,6 +400,7 @@ const resources = {
 
 export async function initWorkspaceI18n() {
   if (i18n.isInitialized) {
+    syncWorkspaceI18nResources();
     return i18n;
   }
 
@@ -405,6 +418,12 @@ export async function initWorkspaceI18n() {
   await i18n.changeLanguage(language);
 
   return i18n;
+}
+
+function syncWorkspaceI18nResources() {
+  for (const [language, resource] of Object.entries(resources)) {
+    i18n.addResourceBundle(language, "translation", resource.translation, true, true);
+  }
 }
 
 export async function applyUiLanguagePreference(preference: UiLanguagePreference) {
