@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { fakeBrowser } from "wxt/testing";
+import { storage } from "wxt/utils/storage";
 
 import {
   estimateHistoryStorageUsage,
@@ -24,7 +25,7 @@ describe("translation history storage usage", () => {
         sourceContentFormat: "Markdown",
         translationContentFormat: "Markdown",
         translationDirection: "en-zh",
-        stylePreset: "Faithful",
+        stylePromptName: "Programming technology",
         baseUrl: "https://api.example.com/v1",
         model: "example-chat",
         createdAt: "2026-06-22T08:30:00.000Z",
@@ -56,6 +57,22 @@ describe("translation history storage usage", () => {
 
     await expect(getSavedTranslationHistoryRecords()).resolves.toEqual([record]);
   });
+
+  it("reads legacy history records that used translation style presets", async () => {
+    const legacyRecord = {
+      ...createHistoryRecord(),
+      stylePromptName: undefined,
+      stylePreset: "Faithful",
+    };
+
+    await storage.setItem("local:translation-history", [legacyRecord]);
+
+    await expect(getSavedTranslationHistoryRecords()).resolves.toEqual([
+      expect.objectContaining({
+        stylePromptName: "Programming technology",
+      }),
+    ]);
+  });
 });
 
 function createHistoryRecord(overrides: Partial<TranslationHistoryRecord> = {}): TranslationHistoryRecord {
@@ -67,7 +84,7 @@ function createHistoryRecord(overrides: Partial<TranslationHistoryRecord> = {}):
     sourceContentFormat: "Markdown",
     translationContentFormat: "Markdown",
     translationDirection: "en-zh",
-    stylePreset: "Faithful",
+    stylePromptName: "Programming technology",
     baseUrl: "https://api.example.com/v1",
     model: "example-chat",
     createdAt: "2026-06-23T07:12:00.000Z",

@@ -59,7 +59,7 @@ describe("workspace shell", () => {
     render(<App />);
 
     expect(await screen.findByRole("button", { name: "翻译方向：英语到中文" })).toBeInTheDocument();
-    expect(within(screen.getByRole("form", { name: "翻译控制" })).getByRole("combobox", { name: "翻译风格" })).toHaveValue("忠实");
+    expect(within(screen.getByRole("form", { name: "翻译控制" })).getByRole("combobox", { name: "翻译提示词风格" })).toHaveValue("编程技术");
     expect(within(screen.getByRole("region", { name: "原文" })).getByRole("group", { name: "原文显示模式" })).toBeInTheDocument();
     expect(within(screen.getByRole("region", { name: "译文" })).getByRole("group", { name: "译文显示模式" })).toBeInTheDocument();
     expect(screen.getByText("输入：Markdown")).toBeInTheDocument();
@@ -104,7 +104,7 @@ describe("workspace shell", () => {
     await user.click(screen.getByRole("button", { name: /Style prompts/ }));
 
     expect(screen.getByRole("heading", { name: "Style prompts", level: 2 })).toBeInTheDocument();
-    expect(screen.getByRole("article", { name: "Programming technology" })).toHaveTextContent("Preserve technical names, commands, code, API names, and file paths");
+    expect(screen.getByRole("article", { name: "Programming technology" })).toHaveTextContent("professional translator specializing in programming");
     expect(screen.getByRole("article", { name: "General" })).toHaveTextContent("Use clear, natural wording for general reading");
 
     await user.click(screen.getByRole("button", { name: "Add style prompt" }));
@@ -418,7 +418,7 @@ describe("workspace shell", () => {
     expect(
       historyButton.compareDocumentPosition(settingsButton) & Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy();
-    expect(within(screen.getByRole("form", { name: "Translation controls" })).getByRole("combobox", { name: "Style preset" })).toHaveValue("Faithful");
+    expect(await within(screen.getByRole("form", { name: "Translation controls" })).findByRole("combobox", { name: "Translation style prompt" })).toHaveValue("Programming technology");
     expect(container.querySelector("select")).not.toBeInTheDocument();
     expect(getPressedDisplayMode(screen.getByRole("region", { name: "Source" }), "Source display mode")).toHaveTextContent("Markdown");
     expect(getPressedDisplayMode(screen.getByRole("region", { name: "Translation" }), "Translation display mode")).toHaveTextContent("Markdown");
@@ -576,9 +576,36 @@ describe("workspace shell", () => {
     const historyItem = within(historyDrawer).getByRole("button", { name: /Restore Release notes/ });
 
     expect(historyItem).toHaveTextContent("Release notes");
-    expect(historyItem).toHaveTextContent(/Faithful/);
+    expect(historyItem).toHaveTextContent(/Programming technology/);
     expect(historyItem).toHaveTextContent(/example-chat/);
     expect(historyItem).toHaveTextContent(/B|KB|MB/);
+  });
+
+  it("uses the selected style prompt when translating", async () => {
+    const user = userEvent.setup();
+    await saveAISettings({
+      baseUrl: "https://api.example.com/v1",
+      apiKey: "sk-real-key",
+      model: "example-chat",
+    });
+
+    render(<App />);
+    await setSourceMarkdown(user, "# Release notes");
+
+    const stylePromptCombobox = await within(screen.getByRole("form", { name: "Translation controls" })).findByRole("combobox", { name: "Translation style prompt" });
+    await user.click(stylePromptCombobox);
+    await user.click(await screen.findByRole("option", { name: "General" }));
+    await user.click(screen.getByRole("button", { name: "Translate" }));
+
+    expect(translationMocks.translateSourceContent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        stylePrompt: "Use clear, natural wording for general reading. Keep the tone neutral and avoid adding details that are not in the source.",
+      }),
+    );
+
+    await user.click(screen.getByRole("button", { name: "Open translation history" }));
+    const historyDrawer = await screen.findByRole("dialog", { name: "Translation history" });
+    expect(within(historyDrawer).getByRole("button", { name: /Restore Release notes/ })).toHaveTextContent(/General/);
   });
 
   it("shows thinking output while translating and removes it after translation completes", async () => {
@@ -799,7 +826,7 @@ function createHistoryRecord(overrides: Partial<TranslationHistoryRecord> = {}):
     sourceContentFormat: "Markdown",
     translationContentFormat: "Markdown",
     translationDirection: "en-zh",
-    stylePreset: "Faithful",
+    stylePromptName: "Programming technology",
     baseUrl: "https://api.example.com/v1",
     model: "example-chat",
     createdAt: "2026-06-23T07:12:00.000Z",

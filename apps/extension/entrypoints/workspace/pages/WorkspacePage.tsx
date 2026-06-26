@@ -1,4 +1,4 @@
-import { Component, useLayoutEffect, useRef, useState } from "react";
+import { Component, useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   ArrowRightLeft,
   Clipboard,
@@ -64,22 +64,16 @@ import {
   getSavedAISettings,
   type AISettings,
 } from "../ai-settings";
+import { builtInStylePrompts, getSavedStylePrompts, type StylePrompt } from "../style-prompts";
 import {
   estimateHistoryRecordStorageBytes,
   formatStorageBytes,
   type ContentFormat,
   type TranslationDirection,
   type TranslationHistoryRecord,
-  type TranslationStylePreset,
 } from "../translation-history";
 import { translateSourceContent } from "../translation-service";
 import { useWorkspaceStore } from "../workspace-store";
-
-const styleOptions = [
-  { value: "Faithful", labelKey: "workspace.stylePresets.faithful" },
-  { value: "Natural", labelKey: "workspace.stylePresets.natural" },
-  { value: "Polished", labelKey: "workspace.stylePresets.polished" },
-];
 
 const inputTypeOptions = [
   { value: "Markdown", labelKey: "common.formats.markdown" },
@@ -102,6 +96,8 @@ export function WorkspacePage({ onOpenSettings }: WorkspacePageProps) {
   const { t } = useTranslation();
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isFileDragActive, setIsFileDragActive] = useState(false);
+  const [stylePrompts, setStylePrompts] = useState<StylePrompt[]>(builtInStylePrompts);
+  const [selectedStylePromptId, setSelectedStylePromptId] = useState(builtInStylePrompts[0]?.id ?? "");
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const fileDragDepthRef = useRef(0);
   const activeTranslationAbortControllerRef = useRef<AbortController | null>(null);
@@ -130,21 +126,42 @@ export function WorkspacePage({ onOpenSettings }: WorkspacePageProps) {
   const direction = translationDirections[translationDirection];
   const sourceLanguage = t(direction.sourceKey);
   const targetLanguage = t(direction.targetKey);
-  const selectedStyleLabel = t("workspace.stylePresets.faithful");
   const sourceContentFormat: ContentFormat = "Markdown";
   const translationContentFormat: ContentFormat = "Markdown";
   const sourceContentFormatLabel = t("common.formats.markdown");
-  const stylePreset: TranslationStylePreset = "Faithful";
+  const selectedStylePrompt = stylePrompts.find((stylePrompt) => stylePrompt.id === selectedStylePromptId) ?? stylePrompts[0];
+  const selectedStylePromptName = selectedStylePrompt ? getStylePromptDisplayName(selectedStylePrompt, t) : "";
   const isTranslating = translationStatus === "streaming";
   const hasSourceContent = sourceContent.trim().length > 0;
   const hasTranslationContent = translationContent.trim().length > 0;
-  const canTranslate = hasSourceContent && !isTranslating;
+  const canTranslate = hasSourceContent && !isTranslating && Boolean(selectedStylePrompt);
   const canUseSourceActions = !isTranslating;
   const canUseTranslationActions = hasTranslationContent && !isTranslating;
   const shouldShowThinkingStatus = isTranslating && translationThinkingContent.trim().length > 0 && !hasTranslationContent;
 
+  useEffect(() => {
+    let isMounted = true;
+
+    getSavedStylePrompts().then((savedPrompts) => {
+      if (!isMounted) {
+        return;
+      }
+
+      setStylePrompts(savedPrompts);
+      setSelectedStylePromptId((currentId) => (
+        savedPrompts.some((stylePrompt) => stylePrompt.id === currentId)
+          ? currentId
+          : savedPrompts[0]?.id ?? ""
+      ));
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   async function handleTranslate() {
-    if (!hasSourceContent || isTranslating) {
+    if (!hasSourceContent || isTranslating || !selectedStylePrompt) {
       return;
     }
 
@@ -172,7 +189,7 @@ export function WorkspacePage({ onOpenSettings }: WorkspacePageProps) {
         sourceContent,
         sourceContentFormat,
         translationDirection,
-        stylePreset,
+        stylePrompt: selectedStylePrompt.prompt,
         settings: providerSettings,
         abortSignal: abortController.signal,
       })) {
@@ -200,7 +217,7 @@ export function WorkspacePage({ onOpenSettings }: WorkspacePageProps) {
         sourceContentFormat,
         translationContentFormat,
         translationDirection,
-        stylePreset,
+        stylePromptName: selectedStylePromptName,
         baseUrl: providerSettings.baseUrl,
         model: providerSettings.model,
         createdAt: new Date().toISOString(),
@@ -348,9 +365,13 @@ export function WorkspacePage({ onOpenSettings }: WorkspacePageProps) {
             {t("workspace.translate")}
           </Button>
           <WorkspaceCombobox
-            ariaLabel={t("workspace.stylePresets.label")}
-            value="Faithful"
-            options={styleOptions}
+            ariaLabel={t("workspace.stylePrompts.label")}
+            value={selectedStylePrompt?.id ?? ""}
+            options={stylePrompts.map((stylePrompt) => ({
+              value: stylePrompt.id,
+              label: getStylePromptDisplayName(stylePrompt, t),
+            }))}
+            onValueChange={setSelectedStylePromptId}
             className={compactComboboxClassName}
           />
         </form>
@@ -465,7 +486,7 @@ export function WorkspacePage({ onOpenSettings }: WorkspacePageProps) {
         <WorkspacePanel
           title={t("workspace.panels.translation.title")}
           meta={t("workspace.panels.translation.meta", {
-            style: selectedStyleLabel,
+            style: selectedStylePromptName || t("workspace.stylePrompts.none"),
             model: t("workspace.panels.translation.noModel"),
           })}
           headerControl={
@@ -556,9 +577,9 @@ type WorkspacePanelProps = {
 
 type WorkspaceComboboxProps = {
   ariaLabel: string;
-  value: ContentFormat | string;
-  onValueChange?: (value: ContentFormat) => void;
-  options: readonly { value: ContentFormat | string; labelKey: string }[];
+  value: string;
+  onValueChange?: (value: string) => void;
+  options: readonly { value: string; label: string }[];
   className?: string;
 };
 
@@ -598,22 +619,17 @@ function TranslationDirectionButton({ source, target, ariaLabel, onSwitch }: Tra
 }
 
 export function WorkspaceCombobox({ ariaLabel, value, onValueChange, options, className }: WorkspaceComboboxProps) {
-  const { t } = useTranslation();
-  const localizedOptions = options.map((option) => ({
-    value: option.value,
-    label: t(option.labelKey),
-  }));
-  const selectedOption = localizedOptions.find((option) => option.value === value);
+  const selectedOption = options.find((option) => option.value === value);
 
   return (
     <Combobox
       value={selectedOption?.label ?? value}
-      items={localizedOptions.map((option) => option.label)}
+      items={options.map((option) => option.label)}
       onValueChange={(nextLabel) => {
-        const nextOption = localizedOptions.find((option) => option.label === nextLabel);
+        const nextOption = options.find((option) => option.label === nextLabel);
 
         if (nextOption) {
-          onValueChange?.(nextOption.value as ContentFormat);
+          onValueChange?.(nextOption.value);
         }
       }}
     >
@@ -626,7 +642,7 @@ export function WorkspaceCombobox({ ariaLabel, value, onValueChange, options, cl
       <ComboboxContent>
         <ComboboxList>
           <ComboboxGroup>
-            {localizedOptions.map((option) => (
+            {options.map((option) => (
               <ComboboxItem key={option.value} value={option.label}>
                 {option.label}
               </ComboboxItem>
@@ -636,6 +652,12 @@ export function WorkspaceCombobox({ ariaLabel, value, onValueChange, options, cl
       </ComboboxContent>
     </Combobox>
   );
+}
+
+function getStylePromptDisplayName(stylePrompt: StylePrompt, t: ReturnType<typeof useTranslation>["t"]): string {
+  return stylePrompt.source === "built-in"
+    ? t(`settings.stylePrompts.builtIns.${stylePrompt.id}.name`)
+    : stylePrompt.name;
 }
 
 function ContentDisplayModeControl({ ariaLabel, value, onValueChange }: ContentDisplayModeControlProps) {
@@ -739,7 +761,7 @@ function TranslationHistoryDrawer({ records, onDeleteRecord, onRestoreRecord }: 
                         >
                           <CardTitle className="truncate text-[0.95rem] leading-5">{record.title}</CardTitle>
                           <CardDescription className="mt-1 truncate text-xs leading-5">
-                            {formatHistoryDate(record.createdAt, i18n.language)} · {record.stylePreset}
+                            {formatHistoryDate(record.createdAt, i18n.language)} · {record.stylePromptName}
                           </CardDescription>
                           <div className="mt-2 flex min-w-0 flex-wrap items-center gap-1.5">
                             <span className="max-w-full truncate rounded-md border border-border/60 bg-muted/70 px-1.5 py-0.5 font-mono text-xs text-muted-foreground" translate="no">

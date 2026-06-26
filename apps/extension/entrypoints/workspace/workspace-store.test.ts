@@ -67,7 +67,7 @@ function createHistoryRecord(overrides: Partial<TranslationHistoryRecord> = {}):
     sourceContentFormat: "Markdown",
     translationContentFormat: "Markdown",
     translationDirection: "en-zh",
-    stylePreset: "Faithful",
+    stylePromptName: "Programming technology",
     baseUrl: "https://api.example.com/v1",
     model: "example-chat",
     createdAt: "2026-06-23T07:12:00.000Z",

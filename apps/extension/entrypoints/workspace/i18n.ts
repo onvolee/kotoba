@@ -2,6 +2,8 @@ import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 import { storage } from "wxt/utils/storage";
 
+import { programmingTechnologyPrompt } from "./style-prompts";
+
 export type UiLanguage = "en" | "zh-CN";
 export type UiLanguagePreference = "browser" | UiLanguage;
 
@@ -83,11 +85,9 @@ const resources = {
             title: "Translation",
           },
         },
-        stylePresets: {
-          faithful: "Faithful",
-          label: "Style preset",
-          natural: "Natural",
-          polished: "Polished",
+        stylePrompts: {
+          label: "Translation style prompt",
+          none: "No style prompt",
         },
         subtitle: "Markdown and text translation workspace",
         translate: "Translate",
@@ -120,7 +120,7 @@ const resources = {
           showApiKey: "Show API key",
           status: "Connection not tested",
           testConnection: "Test connection",
-          thinkingModeDescription: "Allow reasoning models to spend extra time thinking before they translate. Thinking text appears only while a translation is running.",
+          thinkingModeDescription: "Turn model thinking on or off. When enabled, reasoning models can think before answering and the thinking process appears while translation is running.",
           thinkingModeLabel: "Thinking mode",
           title: "AI settings",
         },
@@ -173,7 +173,7 @@ const resources = {
             },
             "built-in-programming-technology": {
               name: "Programming technology",
-              prompt: "Preserve technical names, commands, code, API names, and file paths. Use precise terminology and keep explanations compact.",
+              prompt: programmingTechnologyPrompt,
             },
           },
           customBadge: "Custom",
@@ -271,11 +271,9 @@ const resources = {
             title: "译文",
           },
         },
-        stylePresets: {
-          faithful: "忠实",
-          label: "翻译风格",
-          natural: "自然",
-          polished: "润色",
+        stylePrompts: {
+          label: "翻译提示词风格",
+          none: "未选择提示词",
         },
         subtitle: "Markdown 与文本翻译工作区",
         translate: "翻译",
@@ -308,7 +306,7 @@ const resources = {
           showApiKey: "显示 API key",
           status: "连接未测试",
           testConnection: "测试连接",
-          thinkingModeDescription: "允许推理模型在翻译前花额外时间思考。思考内容只会在翻译进行中显示。",
+          thinkingModeDescription: "开启或关闭模型 Thinking 模式。开启后，推理模型可以先思考再回答，翻译进行时右侧面板会显示思考过程。",
           thinkingModeLabel: "Thinking 模式",
           title: "AI 设置",
         },
@@ -361,7 +359,7 @@ const resources = {
             },
             "built-in-programming-technology": {
               name: "编程技术",
-              prompt: "保留技术名称、命令、代码、API 名称和文件路径。使用准确术语，并保持说明紧凑。",
+              prompt: programmingTechnologyPrompt,
             },
           },
           customBadge: "自定义",

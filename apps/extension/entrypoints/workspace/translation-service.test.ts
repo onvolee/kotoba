@@ -28,6 +28,7 @@ describe("translation service", () => {
   it("streams translated text from the configured OpenAI-compatible provider", async () => {
     aiMocks.streamText.mockReturnValue({
       fullStream: toAsyncIterable([
+        { type: "reasoning-delta", text: "Provider reasoning that should stay hidden." },
         { type: "text-delta", text: "# 标题\n\n" },
         { type: "text-delta", text: "正文" },
       ]),
@@ -39,7 +40,7 @@ describe("translation service", () => {
       sourceContent: "# Title",
       sourceContentFormat: "Markdown",
       translationDirection: "en-zh",
-      stylePreset: "Faithful",
+      stylePrompt: "Use technical translation rules.",
       settings: {
         baseUrl: "https://api.example.com/v1",
         apiKey: "sk-test-key",
@@ -58,8 +59,12 @@ describe("translation service", () => {
     expect(aiMocks.chatModel).toHaveBeenCalledWith("example-chat");
     expect(aiMocks.streamText).toHaveBeenCalledWith(expect.objectContaining({
       prompt: "# Title",
-      providerOptions: undefined,
-      system: expect.stringContaining("Translate English to Simplified Chinese."),
+      providerOptions: {
+        openaiCompatible: {
+          reasoningEffort: "none",
+        },
+      },
+      system: expect.stringMatching(/Translate English to Simplified Chinese.[\s\S]*Use technical translation rules./),
     }));
   });
 
@@ -77,7 +82,7 @@ describe("translation service", () => {
       sourceContent: "# Title",
       sourceContentFormat: "Markdown",
       translationDirection: "en-zh",
-      stylePreset: "Faithful",
+      stylePrompt: "Use technical translation rules.",
       settings: {
         baseUrl: "https://api.example.com/v1",
         apiKey: "sk-test-key",
@@ -107,7 +112,7 @@ describe("translation service", () => {
         sourceContent: "# Title",
         sourceContentFormat: "Markdown",
         translationDirection: "en-zh",
-        stylePreset: "Faithful",
+        stylePrompt: "Use technical translation rules.",
         settings: {
           baseUrl: "",
           apiKey: "",

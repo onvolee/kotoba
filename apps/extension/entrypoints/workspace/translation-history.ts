@@ -2,7 +2,6 @@ import { storage } from "wxt/utils/storage";
 
 export type TranslationDirection = "en-zh" | "zh-en";
 export type ContentFormat = "Markdown" | "Plain text";
-export type TranslationStylePreset = "Faithful" | "Natural" | "Polished";
 
 export type TranslationHistoryRecord = {
   id: string;
@@ -12,7 +11,7 @@ export type TranslationHistoryRecord = {
   sourceContentFormat: ContentFormat;
   translationContentFormat: ContentFormat;
   translationDirection: TranslationDirection;
-  stylePreset: TranslationStylePreset;
+  stylePromptName: string;
   baseUrl: string;
   model: string;
   createdAt: string;
@@ -89,7 +88,7 @@ function toPersistedHistoryRecord(record: TranslationHistoryRecord) {
     sourceContentFormat: record.sourceContentFormat,
     translationContentFormat: record.translationContentFormat,
     translationDirection: record.translationDirection,
-    stylePreset: record.stylePreset,
+    stylePromptName: record.stylePromptName,
     baseUrl: record.baseUrl,
     model: record.model,
     createdAt: record.createdAt,
@@ -109,7 +108,7 @@ function normalizeTranslationHistoryRecord(value: unknown): TranslationHistoryRe
     sourceContentFormat: readContentFormat(value.sourceContentFormat),
     translationContentFormat: readContentFormat(value.translationContentFormat),
     translationDirection: readTranslationDirection(value.translationDirection),
-    stylePreset: readTranslationStylePreset(value.stylePreset),
+    stylePromptName: readString(value.stylePromptName) || readLegacyTranslationStylePreset(value.stylePreset),
     baseUrl: readString(value.baseUrl),
     model: readString(value.model),
     createdAt: readString(value.createdAt),
@@ -123,7 +122,7 @@ function normalizeTranslationHistoryRecord(value: unknown): TranslationHistoryRe
     || !record.sourceContentFormat
     || !record.translationContentFormat
     || !record.translationDirection
-    || !record.stylePreset
+    || !record.stylePromptName
     || !record.createdAt
   ) {
     return null;
@@ -137,7 +136,7 @@ function normalizeTranslationHistoryRecord(value: unknown): TranslationHistoryRe
     sourceContentFormat: record.sourceContentFormat,
     translationContentFormat: record.translationContentFormat,
     translationDirection: record.translationDirection,
-    stylePreset: record.stylePreset,
+    stylePromptName: record.stylePromptName,
     baseUrl: record.baseUrl,
     model: record.model,
     createdAt: record.createdAt,
@@ -160,8 +159,16 @@ function readTranslationDirection(value: unknown): TranslationDirection | null {
   return value === "en-zh" || value === "zh-en" ? value : null;
 }
 
-function readTranslationStylePreset(value: unknown): TranslationStylePreset | null {
-  return value === "Faithful" || value === "Natural" || value === "Polished" ? value : null;
+function readLegacyTranslationStylePreset(value: unknown): string {
+  if (value === "Faithful") {
+    return "Programming technology";
+  }
+
+  if (value === "Natural" || value === "Polished") {
+    return "General";
+  }
+
+  return "";
 }
 
 function countCredentialLeaks(records: TranslationHistoryRecord[]): number {

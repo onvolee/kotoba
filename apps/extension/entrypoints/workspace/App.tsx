@@ -16,10 +16,6 @@ function App() {
   const [isI18nReady, setIsI18nReady] = useState(false);
   const [route, setRoute] = useState<WorkspaceRoute>(() => getWorkspaceRoute());
 
-  const tags = Array.from({ length: 50 }).map(
-    (_, i, a) => `v1.2.0-beta.${a.length - i}`
-  )
-
   // return (
   //   <>
   //     <ScrollArea className="h-72 w-48 rounded-md border">

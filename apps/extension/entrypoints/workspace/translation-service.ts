@@ -2,13 +2,13 @@ import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { streamText } from "ai";
 
 import { type AISettings } from "./ai-settings";
-import { type ContentFormat, type TranslationDirection, type TranslationStylePreset } from "./translation-history";
+import { type ContentFormat, type TranslationDirection } from "./translation-history";
 
 export type TranslateSourceContentOptions = {
   sourceContent: string;
   sourceContentFormat: ContentFormat;
   translationDirection: TranslationDirection;
-  stylePreset: TranslationStylePreset;
+  stylePrompt: string;
   settings: AISettings;
   abortSignal?: AbortSignal;
 };
@@ -30,18 +30,16 @@ export async function* translateSourceContent(options: TranslateSourceContentOpt
     }).chatModel(options.settings.model),
     system: buildTranslationSystemPrompt(options),
     prompt: options.sourceContent,
-    providerOptions: options.settings.thinkingEnabled
-      ? {
-          openaiCompatible: {
-            reasoningEffort: "medium",
-          },
-        }
-      : undefined,
+    providerOptions: {
+      openaiCompatible: {
+        reasoningEffort: options.settings.thinkingEnabled ? "medium" : "none",
+      },
+    },
     abortSignal: options.abortSignal,
   });
 
   for await (const part of result.fullStream) {
-    if (part.type === "reasoning-delta") {
+    if (part.type === "reasoning-delta" && options.settings.thinkingEnabled) {
       yield { type: "thinking", text: part.text };
     }
 
@@ -63,8 +61,9 @@ function buildTranslationSystemPrompt(options: TranslateSourceContentOptions): s
   return [
     "You are Kotoba, a precise document translation engine.",
     direction,
-    `Use a ${options.stylePreset.toLowerCase()} translation style.`,
     `The source content format is ${options.sourceContentFormat}.`,
+    "Apply the selected translation style prompt exactly:",
+    options.stylePrompt,
     "Preserve Markdown structure, headings, lists, tables, links, URLs, inline code, fenced code blocks, commands, API names, and placeholders.",
     "Return only the translated content. Do not add explanations.",
   ].join("\n");
