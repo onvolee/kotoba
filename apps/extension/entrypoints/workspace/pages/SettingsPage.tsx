@@ -16,6 +16,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -202,6 +203,7 @@ function AISettingsModule() {
     const savedSettings = await saveAISettings(settings);
     setSettings(savedSettings);
     setConnectionStatus(savedSettings.connectionStatus);
+    toast.success(t("settings.savedToast"));
   }
 
   async function handleTestConnection() {
@@ -375,6 +377,7 @@ function StylePromptsModule() {
     }
 
     closeEditor();
+    toast.success(t("settings.savedToast"));
   }
 
   return (
@@ -628,9 +631,12 @@ function PerformanceModule() {
           <Button
             type="button"
             className="rounded-full px-4"
-            onClick={() => {
-              void applyUiLanguagePreference(uiLanguagePreference);
-              void applyThemePreference(themePreference);
+            onClick={async () => {
+              await Promise.all([
+                applyUiLanguagePreference(uiLanguagePreference),
+                applyThemePreference(themePreference),
+              ]);
+              toast.success(t("settings.savedToast"));
             }}
           >
             {t("settings.saveChanges")}

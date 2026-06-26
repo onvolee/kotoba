@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fakeBrowser } from "wxt/testing";
+import { Toaster } from "@/components/ui/sonner";
 import App from "./App";
 import { resetWorkspaceI18nForTests } from "./i18n";
 import { ContentViewer } from "./pages/WorkspacePage";
@@ -228,6 +229,51 @@ describe("workspace shell", () => {
     await waitFor(() => expect(screen.getByLabelText("Base URL")).toHaveValue("https://api.example.com/v1"));
     expect(screen.getByLabelText("API Key")).toHaveValue("sk-real-key");
     expect(screen.getByLabelText("Model")).toHaveValue("example-chat");
+  });
+
+  it("shows a toast after saving AI provider settings", async () => {
+    const user = userEvent.setup();
+
+    renderAppWithToaster();
+
+    await user.click(await screen.findByRole("button", { name: "Open settings" }));
+    await user.click(screen.getByRole("button", { name: /AI settings/ }));
+
+    await user.type(screen.getByLabelText("Base URL"), "https://api.example.com/v1");
+    await user.type(screen.getByLabelText("API Key"), "sk-real-key");
+    await user.type(screen.getByLabelText("Model"), "example-chat");
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+
+    expect(await screen.findByText("Settings saved")).toBeInTheDocument();
+  });
+
+  it("shows a toast after saving display preferences", async () => {
+    const user = userEvent.setup();
+
+    renderAppWithToaster();
+
+    await user.click(await screen.findByRole("button", { name: "Open settings" }));
+    await user.click(screen.getByRole("button", { name: "Dark" }));
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+
+    expect(await screen.findByText("Settings saved")).toBeInTheDocument();
+  });
+
+  it("shows a toast after saving a style prompt", async () => {
+    const user = userEvent.setup();
+
+    renderAppWithToaster();
+
+    await user.click(await screen.findByRole("button", { name: "Open settings" }));
+    await user.click(screen.getByRole("button", { name: /Style prompts/ }));
+    await user.click(screen.getByRole("button", { name: "Add style prompt" }));
+
+    const promptEditor = await screen.findByRole("dialog", { name: "New style prompt" });
+    await user.type(within(promptEditor).getByLabelText("Style name"), "Release notes");
+    await user.type(within(promptEditor).getByLabelText("Prompt"), "Translate release notes with concise product language.");
+    await user.click(within(promptEditor).getByRole("button", { name: "Add style prompt" }));
+
+    expect(await screen.findByText("Settings saved")).toBeInTheDocument();
   });
 
   it("saves thinking mode with AI provider settings", async () => {
@@ -798,6 +844,15 @@ function getDisplayModeButton(panel: HTMLElement, groupName: string, optionName:
 
 function getPressedDisplayMode(panel: HTMLElement, groupName: string) {
   return within(within(panel).getByRole("group", { name: groupName })).getByRole("button", { pressed: true });
+}
+
+function renderAppWithToaster() {
+  return render(
+    <>
+      <App />
+      <Toaster />
+    </>,
+  );
 }
 
 async function setSourceMarkdown(user: ReturnType<typeof userEvent.setup>, content: string) {

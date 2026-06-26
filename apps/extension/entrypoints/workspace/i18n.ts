@@ -161,6 +161,7 @@ const resources = {
           uiLanguageLabel: "UI language",
         },
         saveChanges: "Save changes",
+        savedToast: "Settings saved",
         stylePrompts: {
           addAction: "Add style prompt",
           addDescription: "Create a reusable prompt that describes how AI should shape wording and tone.",
@@ -347,6 +348,7 @@ const resources = {
           uiLanguageLabel: "界面语言",
         },
         saveChanges: "保存更改",
+        savedToast: "设置已保存",
         stylePrompts: {
           addAction: "添加风格提示词",
           addDescription: "创建一条可复用提示词，用来描述 AI 应该如何处理措辞和语气。",
