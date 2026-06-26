@@ -74,6 +74,7 @@ const resources = {
             uploadedToast: "Source file loaded",
           },
           translation: {
+            contentLabel: "Translation output",
             copiedToast: "Translation copied",
             downloadFilename: "Download .zh.md",
             errorDescription: "Check the AI provider Base URL, API key, and model, then try again.",
@@ -93,6 +94,7 @@ const resources = {
         },
         subtitle: "Markdown and text translation workspace",
         translate: "Translate",
+        translating: "Translating...",
       },
       settings: {
         activeModule: "Active settings module",
@@ -267,6 +269,7 @@ const resources = {
             uploadedToast: "已载入原文文件",
           },
           translation: {
+            contentLabel: "译文内容",
             copiedToast: "译文已复制",
             downloadFilename: "下载 .zh.md",
             errorDescription: "请检查 AI 服务的 Base URL、API Key 和模型名称，然后重试。",
@@ -286,6 +289,7 @@ const resources = {
         },
         subtitle: "Markdown 与文本翻译工作区",
         translate: "翻译",
+        translating: "翻译中...",
       },
       settings: {
         activeModule: "当前设置模块",

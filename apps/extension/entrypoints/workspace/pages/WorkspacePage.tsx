@@ -372,7 +372,7 @@ export function WorkspacePage({ onOpenSettings }: WorkspacePageProps) {
             onClick={handleTranslate}
           >
             <Play data-icon="inline-start" />
-            {t("workspace.translate")}
+            {isTranslating ? t("workspace.translating") : t("workspace.translate")}
           </Button>
           <WorkspaceCombobox
             ariaLabel={t("workspace.stylePrompts.label")}
@@ -550,6 +550,8 @@ export function WorkspacePage({ onOpenSettings }: WorkspacePageProps) {
         >
           <div className="relative flex min-h-0 flex-1">
             <ContentViewer
+              ariaLabel={t("workspace.panels.translation.contentLabel")}
+              autoScrollToBottomKey={translationContent}
               content={translationContent}
               contentFormat={translationContentFormat}
               placeholder={t("workspace.panels.translation.placeholder")}
@@ -927,6 +929,7 @@ function getHistoryTitle(sourceContent: string): string {
 
 type ContentViewerProps = {
   ariaLabel?: string;
+  autoScrollToBottomKey?: string;
   content: string;
   contentFormat: ContentFormat;
   editable?: boolean;
@@ -989,7 +992,7 @@ function WorkspaceFileDropOverlay() {
   );
 }
 
-export function ContentViewer({ ariaLabel, content, contentFormat, editable = false, onContentChange, placeholder, viewFormat }: ContentViewerProps) {
+export function ContentViewer({ ariaLabel, autoScrollToBottomKey, content, contentFormat, editable = false, onContentChange, placeholder, viewFormat }: ContentViewerProps) {
   const shouldRenderPlainText = viewFormat === "Plain text";
   void contentFormat;
 
@@ -1010,7 +1013,10 @@ export function ContentViewer({ ariaLabel, content, contentFormat, editable = fa
         aria-label={ariaLabel}
         className="min-h-0 flex-1 overflow-hidden rounded-lg border bg-card p-1 shadow-[inset_0_1px_0_rgb(255_255_255/0.60)]"
       >
-        <WorkspaceScrollArea>
+        <WorkspaceScrollArea
+          ariaLabel={ariaLabel ? `${ariaLabel} scroll area` : undefined}
+          autoScrollToBottomKey={autoScrollToBottomKey}
+        >
           <div className="p-3 pr-5 font-mono text-sm leading-6">
             {content.trim().length > 0 ? (
               <pre className="whitespace-pre-wrap">{content}</pre>
@@ -1023,7 +1029,14 @@ export function ContentViewer({ ariaLabel, content, contentFormat, editable = fa
     );
   }
 
-  return <MarkdownArticle ariaLabel={ariaLabel} content={content} placeholder={placeholder} />;
+  return (
+    <MarkdownArticle
+      ariaLabel={ariaLabel}
+      autoScrollToBottomKey={autoScrollToBottomKey}
+      content={content}
+      placeholder={placeholder}
+    />
+  );
 }
 
 type SourceEditorProps = {
@@ -1070,15 +1083,17 @@ function SourceEditor({ ariaLabel, content, onContentChange, placeholder }: Sour
 
 type MarkdownArticleProps = {
   ariaLabel?: string;
+  autoScrollToBottomKey?: string;
   content: string;
   placeholder?: string;
 };
 
-function MarkdownArticle({ ariaLabel, content, placeholder }: MarkdownArticleProps) {
+function MarkdownArticle({ ariaLabel, autoScrollToBottomKey, content, placeholder }: MarkdownArticleProps) {
   if (content.trim().length === 0) {
     return (
       <RawTextArticle
         ariaLabel={ariaLabel}
+        autoScrollToBottomKey={autoScrollToBottomKey}
         content=""
         placeholder={placeholder}
       />
@@ -1087,10 +1102,10 @@ function MarkdownArticle({ ariaLabel, content, placeholder }: MarkdownArticlePro
 
   return (
     <MarkdownRenderBoundary
-      key={content}
       fallback={
         <RawTextArticle
           ariaLabel={ariaLabel}
+          autoScrollToBottomKey={autoScrollToBottomKey}
           content={content}
         />
       }
@@ -1099,7 +1114,10 @@ function MarkdownArticle({ ariaLabel, content, placeholder }: MarkdownArticlePro
         aria-label={ariaLabel}
         className="min-h-0 flex-1 overflow-hidden rounded-lg border bg-card p-1 shadow-[inset_0_1px_0_rgb(255_255_255/0.60)]"
       >
-        <WorkspaceScrollArea>
+        <WorkspaceScrollArea
+          ariaLabel={ariaLabel ? `${ariaLabel} scroll area` : undefined}
+          autoScrollToBottomKey={autoScrollToBottomKey}
+        >
           <div className="p-3 pr-5 text-sm leading-6">
             <Streamdown
               mode="static"
@@ -1118,17 +1136,21 @@ function MarkdownArticle({ ariaLabel, content, placeholder }: MarkdownArticlePro
 
 type RawTextArticleProps = {
   ariaLabel?: string;
+  autoScrollToBottomKey?: string;
   content: string;
   placeholder?: string;
 };
 
-function RawTextArticle({ ariaLabel, content, placeholder }: RawTextArticleProps) {
+function RawTextArticle({ ariaLabel, autoScrollToBottomKey, content, placeholder }: RawTextArticleProps) {
   return (
     <article
       aria-label={ariaLabel}
       className="min-h-0 flex-1 overflow-hidden rounded-lg border bg-card p-1 shadow-[inset_0_1px_0_rgb(255_255_255/0.60)]"
     >
-      <WorkspaceScrollArea>
+      <WorkspaceScrollArea
+        ariaLabel={ariaLabel ? `${ariaLabel} scroll area` : undefined}
+        autoScrollToBottomKey={autoScrollToBottomKey}
+      >
         <div className="p-3 pr-5 font-mono text-sm leading-6">
           {content.trim().length > 0 ? (
             <pre className="whitespace-pre-wrap">{content}</pre>
@@ -1142,15 +1164,45 @@ function RawTextArticle({ ariaLabel, content, placeholder }: RawTextArticleProps
 }
 
 function WorkspaceScrollArea({
+  ariaLabel,
+  autoScrollToBottomKey,
   children,
   contentClassName,
 }: {
+  ariaLabel?: string;
+  autoScrollToBottomKey?: string;
   children: React.ReactNode;
   contentClassName?: string;
 }) {
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+  const shouldStickToBottomRef = useRef(true);
+
+  function handleViewportScroll(event: React.UIEvent<HTMLDivElement>) {
+    if (autoScrollToBottomKey === undefined) {
+      return;
+    }
+
+    shouldStickToBottomRef.current = isScrolledNearBottom(event.currentTarget);
+  }
+
+  useLayoutEffect(() => {
+    const viewport = viewportRef.current;
+
+    if (!viewport || autoScrollToBottomKey === undefined || !shouldStickToBottomRef.current) {
+      return;
+    }
+
+    viewport.scrollTop = viewport.scrollHeight;
+  }, [autoScrollToBottomKey]);
+
   return (
     <BaseScrollArea.Root className="relative size-full rounded-md">
-      <BaseScrollArea.Viewport className="size-full rounded-[inherit] outline-none">
+      <BaseScrollArea.Viewport
+        ref={viewportRef}
+        aria-label={ariaLabel}
+        className="size-full rounded-[inherit] outline-none"
+        onScroll={handleViewportScroll}
+      >
         <BaseScrollArea.Content className={cn("min-w-fit", contentClassName)}>
           {children}
         </BaseScrollArea.Content>
@@ -1164,6 +1216,10 @@ function WorkspaceScrollArea({
       <BaseScrollArea.Corner />
     </BaseScrollArea.Root>
   );
+}
+
+function isScrolledNearBottom(element: HTMLElement): boolean {
+  return element.scrollHeight - element.scrollTop - element.clientHeight <= 24;
 }
 
 function EmptyContentPlaceholder({ children }: { children?: string }) {

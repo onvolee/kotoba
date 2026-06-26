@@ -769,6 +769,98 @@ describe("workspace shell", () => {
     expect(historyItem).toHaveTextContent(/B|KB|MB/);
   });
 
+  it("keeps the translation output scrolled to the latest streamed content", async () => {
+    const user = userEvent.setup();
+    let releaseSecondChunk: (() => void) | undefined;
+    await saveAISettings({
+      baseUrl: "https://api.example.com/v1",
+      apiKey: "sk-real-key",
+      model: "example-chat",
+    });
+    translationMocks.translateSourceContent.mockImplementation(async function* () {
+      yield { type: "text", text: "# 示例文档\n\n第一段译文。" };
+      await new Promise<void>((resolve) => {
+        releaseSecondChunk = resolve;
+      });
+      yield { type: "text", text: "\n\n第二段译文。" };
+    });
+    const scrollHeightSpy = vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockImplementation(function getScrollHeight(this: HTMLElement) {
+      return this.textContent?.includes("第二段译文") ? 240 : 120;
+    });
+    const clientHeightSpy = vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(0);
+
+    try {
+      render(<App />);
+      await setSourceMarkdown(user, "# Release notes");
+
+      await user.click(screen.getByRole("button", { name: "Translate" }));
+
+      const translationPanel = screen.getByRole("region", { name: "Translation" });
+      const output = await within(translationPanel).findByRole("article", { name: "Translation output" });
+      const viewport = within(output).getByLabelText("Translation output scroll area");
+
+      await waitFor(() => expect(viewport.scrollTop).toBe(120));
+
+      releaseSecondChunk?.();
+
+      expect(await within(translationPanel).findByText("第二段译文。")).toBeInTheDocument();
+
+      const updatedOutput = await within(translationPanel).findByRole("article", { name: "Translation output" });
+      const updatedViewport = within(updatedOutput).getByLabelText("Translation output scroll area");
+      await waitFor(() => expect(updatedViewport.scrollTop).toBe(240));
+    } finally {
+      clientHeightSpy.mockRestore();
+      scrollHeightSpy.mockRestore();
+    }
+  });
+
+  it("does not force the translation output to the bottom after the user scrolls up", async () => {
+    const user = userEvent.setup();
+    let releaseSecondChunk: (() => void) | undefined;
+    await saveAISettings({
+      baseUrl: "https://api.example.com/v1",
+      apiKey: "sk-real-key",
+      model: "example-chat",
+    });
+    translationMocks.translateSourceContent.mockImplementation(async function* () {
+      yield { type: "text", text: "# 示例文档\n\n第一段译文。" };
+      await new Promise<void>((resolve) => {
+        releaseSecondChunk = resolve;
+      });
+      yield { type: "text", text: "\n\n第二段译文。" };
+    });
+    const scrollHeightSpy = vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockImplementation(function getScrollHeight(this: HTMLElement) {
+      return this.textContent?.includes("第二段译文") ? 240 : 120;
+    });
+    const clientHeightSpy = vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(40);
+
+    try {
+      render(<App />);
+      await setSourceMarkdown(user, "# Release notes");
+
+      await user.click(screen.getByRole("button", { name: "Translate" }));
+
+      const translationPanel = screen.getByRole("region", { name: "Translation" });
+      const output = await within(translationPanel).findByRole("article", { name: "Translation output" });
+      const viewport = within(output).getByLabelText("Translation output scroll area");
+
+      await waitFor(() => expect(viewport.scrollTop).toBe(120));
+
+      viewport.scrollTop = 0;
+      fireEvent.scroll(viewport);
+      releaseSecondChunk?.();
+
+      expect(await within(translationPanel).findByText("第二段译文。")).toBeInTheDocument();
+
+      const updatedOutput = await within(translationPanel).findByRole("article", { name: "Translation output" });
+      const updatedViewport = within(updatedOutput).getByLabelText("Translation output scroll area");
+      await waitFor(() => expect(updatedViewport.scrollTop).toBe(0));
+    } finally {
+      clientHeightSpy.mockRestore();
+      scrollHeightSpy.mockRestore();
+    }
+  });
+
   it("uses the selected style prompt when translating", async () => {
     const user = userEvent.setup();
     await saveAISettings({
@@ -820,7 +912,7 @@ describe("workspace shell", () => {
 
     expect(await screen.findByText("AI is thinking")).toBeInTheDocument();
     expect(screen.getByText("Checking headings before translating.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Translate" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Translating..." })).toBeDisabled();
     expect(within(screen.getByRole("region", { name: "Source" })).getByRole("button", { name: "Clear" })).toBeDisabled();
     expect(within(screen.getByRole("region", { name: "Translation" })).getByRole("button", { name: "Stop" })).toBeEnabled();
 
@@ -828,6 +920,27 @@ describe("workspace shell", () => {
 
     expect(await within(screen.getByRole("region", { name: "Translation" })).findByRole("heading", { name: "示例文档" })).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByText("AI is thinking")).not.toBeInTheDocument());
+  });
+
+  it("changes the translate button label while translation is streaming", async () => {
+    const user = userEvent.setup();
+    await saveAISettings({
+      baseUrl: "https://api.example.com/v1",
+      apiKey: "sk-real-key",
+      model: "example-chat",
+    });
+    translationMocks.translateSourceContent.mockImplementation(async function* () {
+      yield { type: "text", text: "# 示例文档" };
+      await new Promise<void>(() => undefined);
+    });
+
+    render(<App />);
+    await setSourceMarkdown(user, "# Release notes");
+
+    await user.click(screen.getByRole("button", { name: "Translate" }));
+
+    expect(await screen.findByRole("button", { name: "Translating..." })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Translate" })).not.toBeInTheDocument();
   });
 
   it("keeps stopped partial output out of translation history", async () => {
