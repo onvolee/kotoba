@@ -888,6 +888,43 @@ describe("workspace shell", () => {
     expect(within(historyDrawer).getByRole("button", { name: /Restore Release notes/ })).toHaveTextContent(/General/);
   });
 
+  it("renders streamed response content before translation completes when thinking is disabled", async () => {
+    const user = userEvent.setup();
+    let releaseTranslation: (() => void) | undefined;
+    await saveAISettings({
+      baseUrl: "https://api.example.com/v1",
+      apiKey: "sk-real-key",
+      model: "example-chat",
+      thinkingEnabled: false,
+    });
+    translationMocks.translateSourceContent.mockImplementation(async function* () {
+      yield { type: "text", text: "# 实时译文" };
+      await new Promise<void>((resolve) => {
+        releaseTranslation = resolve;
+      });
+      yield { type: "text", text: "\n\n第二段译文。" };
+    });
+
+    render(<App />);
+    await setSourceMarkdown(user, "# Release notes");
+
+    await user.click(screen.getByRole("button", { name: "Translate" }));
+
+    const translationPanel = screen.getByRole("region", { name: "Translation" });
+    expect(await within(translationPanel).findByRole("heading", { name: "实时译文" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Translating..." })).toBeDisabled();
+    expect(screen.queryByText("AI is thinking")).not.toBeInTheDocument();
+    expect(translationMocks.translateSourceContent).toHaveBeenCalledWith(expect.objectContaining({
+      settings: expect.objectContaining({
+        thinkingEnabled: false,
+      }),
+    }));
+
+    releaseTranslation?.();
+
+    expect(await within(translationPanel).findByText("第二段译文。")).toBeInTheDocument();
+  });
+
   it("shows thinking output while translating and removes it after translation completes", async () => {
     const user = userEvent.setup();
     let releaseTranslation: (() => void) | undefined;

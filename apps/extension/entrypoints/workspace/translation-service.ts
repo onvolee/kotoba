@@ -31,13 +31,13 @@ export async function* translateSourceContent(options: TranslateSourceContentOpt
     system: buildTranslationSystemPrompt(options),
     prompt: options.sourceContent,
     abortSignal: options.abortSignal,
-    ...(options.settings.thinkingEnabled ? {
-      providerOptions: {
-      openaiCompatible: {
-          reasoningEffort: "medium",
-        },
+    providerOptions: {
+      userProvider: {
+        thinking: options.settings.thinkingEnabled
+          ? { type: "enabled", budgetTokens: 8192 }
+          : { type: "disabled" },
       },
-    } : null),
+    },
   } satisfies Parameters<typeof streamText>[0];
 
   const result = streamText(streamOptions);

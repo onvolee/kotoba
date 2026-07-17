@@ -60,9 +60,13 @@ describe("translation service", () => {
     expect(aiMocks.streamText).toHaveBeenCalledWith(expect.objectContaining({
       prompt: "# Title",
       system: expect.stringMatching(/Translate English to Simplified Chinese.[\s\S]*Use technical translation rules./),
-    }));
-    expect(aiMocks.streamText).toHaveBeenCalledWith(expect.not.objectContaining({
-      providerOptions: expect.anything(),
+      providerOptions: {
+        userProvider: {
+          thinking: {
+            type: "disabled",
+          },
+        },
+      },
     }));
   });
 
@@ -97,8 +101,11 @@ describe("translation service", () => {
     ]);
     expect(aiMocks.streamText).toHaveBeenCalledWith(expect.objectContaining({
       providerOptions: {
-        openaiCompatible: {
-          reasoningEffort: "medium",
+        userProvider: {
+          thinking: {
+            type: "enabled",
+            budgetTokens: 8192,
+          },
         },
       },
     }));
